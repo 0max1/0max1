@@ -1,0 +1,27 @@
+# This is a requirements file for the MevMax project.
+# It lists the required packages for the MevMax project to run successfully.
+# pip install -r requirements.txt
+
+# Database
+psycopg2
+
+# Numerical computation
+numpy
+pandas
+
+# Network analysis
+networkx
+
+# Ethereum blockchain interactions
+web3
+
+# Progress bar
+tqdm
+
+# GraphQL API
+gql
+
+
+
+
+
