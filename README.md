@@ -937,8 +937,15 @@ gql
 For each token pair:
 
 - **ID:** An identifier generated using the keccak-256 hash of the concatenated addresses of the two tokens in the pair.
+
+  ```
+  id_hash = Web3().keccak(text=token0_address + token1_address)
+  ```
+
 - **Tokens:** An array containing the addresses of the two tokens forming the pair.
+
 - **Routes:** This property contains arrays of objects representing routes at different depth levels. Each depth level contains an array of routes.
+
 - For each routes:
   - **Depth X Routes:** Arrays containing routes at depth X, where X represents the depth level.
   - For each route:
