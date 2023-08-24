@@ -51,9 +51,9 @@ def main():
     if depth_limit == 1:
         chunk_size = 50000
     elif depth_limit == 2:
-        chunk_size = 100
+        chunk_size = 5000
     elif depth_limit == 3:
-        chunk_size = 50
+        chunk_size = 100
     if len(pairs) < chunk_size:
         chunk_size = len(pairs)
 

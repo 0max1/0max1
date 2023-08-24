@@ -231,8 +231,9 @@ def main():
          alitaswap_pools, appleswap_pools, cafeswap_pools, cheeseswap_pools, coinswap_pools], ignore_index=True)
 
     # all_pools = pd.concat(
-    #     [apeswap_pools], ignore_index=True)
+    #     [sushiswapv3_pools], ignore_index=True)
     # Convert data types and calculations
+    # Add a logic/function to write to tvl
     all_pools['tvl'] = all_pools['tvl'].fillna(0)
     all_pools['tvl'] = all_pools['tvl'].apply(float)
     all_pools['fee'] = all_pools['fee'].apply(float)

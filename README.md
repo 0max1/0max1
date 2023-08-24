@@ -1,12 +1,11 @@
 <h1 style="text-align:center">MevMax Project </h1>
 
 <h6 style="text-align:right">Author: Justin Jia </h1>
-<h6 style="text-align:right">Edited: AUG 22, 2023</h1>
+<h6 style="text-align:right">Edited: AUG 23, 2023</h1>
+<h6 style="text-align:right">Version: 1.5 </h1>
 
 
-<h6 style="text-align:right">Version: 1.4 </h1>
 This guide outlines the construction of the Definer MevMax database, utilizing RDS Postgres DB and Amazon Neptune or Network Algorithm. The RDS Postgres DB manages data related to DeFi liquidity pools, tokens, trading pairs, protocols, and routes. It enables data management, aggregation, and interaction with the "Arbitrage Bot."
-
 
 
 The database design includes tables for pools, protocols, blockchains, pairs, and tokens, facilitating efficient data retrieval through APIs.
@@ -758,6 +757,14 @@ This provides a utility function to convert liquidity pool CSV data to JSON:
 │   └── init_pool_protocol_poolpair_data.py
 ```
 
+3.1 init_pair_data.py
+
+* During the initialization of pairs in the database, pairs are established based on the `number_holders` for each token. This process involves determining a list of tokens and subsequently forming pairs by combining them pairwise, resulting in the creation of pair IDs.
+
+3.2 init_pool_protocol_poolpair_data.py
+
+* While initializing pools, the parameter `pool_flag` is updated based on the value of Total Value Locked (TVL).
+
 
 
 ## iv. update_mevmax_db package
@@ -767,8 +774,18 @@ This provides a utility function to convert liquidity pool CSV data to JSON:
 │   ├── __init__.py
 │   ├── update_blockchain_data.py
 │   ├── update_token_pair_data.py
-│   └── update_pool_protocol_poolpair_data
+│   └── update_pool_protocol_poolpair_data.py
 ```
+
+4.2 update_token_pair_data.py
+
+* When updating the tokens in the database, a new list of tokens to be inserted is determined based on the number of holders for each token.
+
+* During the process of updating pairs, tokens that meet certain criteria (determined by `number_holders`) are filtered from the database. These selected tokens are then combined in pairs with tokens from the newly inserted token list, resulting in the creation of pair sets and their associated pair IDs.
+
+4.1 update_pool_protocol_poolpair_data.py
+
+* While updating pools, the parameter `pool_flag` is adjusted based on the Total Value Locked (TVL) value.
 
 
 
@@ -813,6 +830,7 @@ This provides a utility function to convert liquidity pool CSV data to JSON:
 5.6 generate_pairs_pools_data.py
 
 * Description: Search the database for data, generate source data for cal_route_pairs.py to run..
+* When calculating routes, pools are filtered based on Total Value Locked (TVL), and pairs are determined based on the number of token holders. This process involves utilizing SQL parameters to introduce additional logic for filtering pairs.
 
 
 
@@ -855,6 +873,8 @@ Code for data analysis and statistics on the generated data and intermediate dat
 - `token_data_path`: Path to the JSON file containing token data.
 - `pool_data_path`: Path to the JSON file containing pool data.
 - `blockchain_name`: Specifies the name of the blockchain, which in this case is "Polygon".
+- `tvl_pool_flag`: Logical parameter to initialize/update `pool_flag` in the "Pool" table in the database.
+- `holders_pair_flag`: Logical parameter to initialize/update `pair_flag` in the "Pair" table in the database.
 
 7.3 **[MAIN] Section**:
 
@@ -870,7 +890,37 @@ Code for data analysis and statistics on the generated data and intermediate dat
 
 
 
-# 5. Routes Data Format
+# 5. Install Package
+
+```
+# This is a requirements file for the MevMax project.
+# It lists the required packages for the MevMax project to run successfully.
+# pip install -r requirements.txt
+
+# Database
+psycopg2
+
+# Numerical computation
+numpy
+pandas
+
+# Network analysis
+networkx
+
+# Ethereum blockchain interactions
+web3
+
+# Progress bar
+tqdm
+
+# GraphQL API
+gql
+# please install the requests-toolbelt package Manually
+```
+
+
+
+# 6. Routes Data Format
 
 **Blockchain Name:** The name of the blockchain being documented.
 
@@ -900,6 +950,8 @@ For each token pair:
       - **Token 0:** The address of one of the tokens in the pool.
       - **Token 1**: The address of the other token in the pool.
       - **Protocol Name:** The name of the protocol that the pool is part of.
+
+
 
 ## i. data_format
 

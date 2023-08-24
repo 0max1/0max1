@@ -28,7 +28,7 @@ def read_token_data(token_data_path):
     return data
 
 
-def update_token_table(connection, token_data):
+def update_token_table(connection, token_data, holders_pair_flag):
     try:
         cursor = connection.cursor()
 
@@ -59,7 +59,8 @@ def update_token_table(connection, token_data):
                         'INSERT INTO "Token" (token_symbol, token_address, decimal, num_holders) VALUES (%s, %s, %s, %s)',
                         (token_symbol, token_address, decimals, num_holders))
                     print(f"New token with address {token_address} inserted.")
-                    new_token_addresses.add(token_address)  # Add new token address to the set
+                    if num_holders >= holders_pair_flag:
+                        new_token_addresses.add(token_address)  # Add new token address to the set
 
                 connection.commit()
                 print("Token data insertion/update complete.")
@@ -71,12 +72,12 @@ def update_token_table(connection, token_data):
     except (Exception, psycopg2.Error) as outer_error:
         print("Error while inserting/updating Token data", outer_error)
 
-def update_pair_table(connection, new_token_addresses):
+def update_pair_table(connection, new_token_addresses, holders_pair_flag):
     try:
         cursor = connection.cursor()
 
         # Get existing token IDs from the Token table
-        cursor.execute('SELECT token_id, token_address FROM "Token"')
+        cursor.execute('SELECT token_id, token_address FROM "Token" WHERE num_holders >= %s', (holders_pair_flag,))
         token_data = cursor.fetchall()
         token_id_by_address = {row[1]: row[0] for row in token_data}
 

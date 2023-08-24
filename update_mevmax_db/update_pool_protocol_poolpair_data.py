@@ -59,31 +59,33 @@ def update_blockchain(cursor, connection, blockchain_name):
     return blockchain_id
 
 # update pool
-def update_pool(cursor, connection, pool_data, blockchain_name):
-    for pool in tqdm(pool_data, total=len(pool_data), desc="Init Tables", unit="pool"):
+def update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag):
+    for pool in tqdm(pool_data, total=len(pool_data), desc="Updating Tables", unit="pool"):
         protocol_name = pool["Name"]
         protocol_id = update_protocol(cursor, connection, protocol_name)
 
         pool_address = pool["pool_address"]
         tvl = pool["tvl"]
         fee = pool["fee"]
-
+        pool_flag = False
         blockchain_id = update_blockchain(cursor, connection, blockchain_name)
 
         cursor.execute('SELECT * FROM "Pool" WHERE pool_address = %s', (pool_address,))
         existing_pool = cursor.fetchone()
-
+        tvl_pool_flag = float(tvl_pool_flag)
+        if tvl >= tvl_pool_flag:
+            pool_flag = True
         if existing_pool:
             pool_id = existing_pool[0]
             cursor.execute(
-                'UPDATE "Pool" SET protocol_id = %s, blockchain_id = %s, tvl = %s, fee = %s WHERE pool_id = %s',
-                (protocol_id, blockchain_id, tvl, fee, pool_id))
-            print(f"Pool with address {pool_address} updated.")
+                'UPDATE "Pool" SET protocol_id = %s, blockchain_id = %s, tvl = %s, fee = %s, pool_flag = %s WHERE pool_id = %s',
+                (protocol_id, blockchain_id, tvl, fee, pool_flag, pool_id))
+            # print(f"Pool with address {pool_address} updated.")
         else:
             cursor.execute(
-                'INSERT INTO "Pool" (pool_address, protocol_id, blockchain_id, tvl, fee) VALUES (%s, %s, %s, %s, %s)',
-                (pool_address, protocol_id, blockchain_id, tvl, fee))
-            print(f"New pool with address {pool_address} inserted.")
+                'INSERT INTO "Pool" (pool_address, protocol_id, blockchain_id, tvl, fee, pool_flag) VALUES (%s, %s, %s, %s, %s, %s)',
+                (pool_address, protocol_id, blockchain_id, tvl, fee, pool_flag))
+            # print(f"New pool with address {pool_address} inserted.")
             connection.commit()
 
             cursor.execute('SELECT lastval()')
@@ -99,11 +101,19 @@ def update_pool_pair(cursor, connection, pool_id, pool):
         if token_address:
             token_symbol = pool.get(f"token{i}_symbol")
             token_decimals = pool.get(f"token{i}_decimals")
-            tokens.append({
-                "token_address": token_address,
-                "token_symbol": token_symbol,
-                "token_decimals": token_decimals
-            })
+
+            if token_symbol and token_decimals:
+                tokens.append({
+                    "token_address": token_address,
+                    "token_symbol": token_symbol,
+                    "token_decimals": token_decimals
+                })
+            else:
+                tokens.append({
+                    "token_address": token_address,
+                    "token_symbol": "Unknown",
+                    "token_decimals": 0
+                })
 
     pairs = set()
 
@@ -165,11 +175,11 @@ def update_pool_pair(cursor, connection, pool_id, pool):
                     connection.commit()
 
 
-def update_pool_table(connection, pool_data, blockchain_name):
+def update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
     try:
         cursor = connection.cursor()
         with tqdm(total=len(pool_data), desc="Updating Tables", unit="pool") as pbar:
-            update_pool(cursor, connection, pool_data, blockchain_name)
+            update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag)
             cursor.close()
             connection.commit()
             print("Pool, Protocol, Pool_Pair Tables update complete.")

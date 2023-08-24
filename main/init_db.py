@@ -26,7 +26,6 @@ def main():
     password = config.get('DATABASE', 'password')
     host = config.get('DATABASE', 'host')
     database = config.get('DATABASE', 'database')
-
     # Create a connection to the PostgreSQL database
     connection = create_connection(user, password, host, database)
 
@@ -39,6 +38,9 @@ def main():
 
     # Extract blockchain name from the configuration
     blockchain_name = config.get('INIT_DB', 'blockchain_name')
+    tvl_pool_flag = config.get('INIT_DB', 'tvl_pool_flag')
+    holders_pair_flag = config.get('INIT_DB', 'holders_pair_flag')
+
 
     if connection:
         # Drop existing tables and constraints, init token, pair, pool, protocol, blockchain, and pool_pair tables
@@ -54,11 +56,11 @@ def main():
         initialize_blockchain_table(connection)
 
         # Init the pair data (insert all combinations between existence tokens)
-        insert_pair_table(connection)
+        insert_pair_table(connection, holders_pair_flag)
 
         # Init the pool, protocol, and pool_pair data. Update the blockchain data
         pool_data = read_pool_data(pool_data_path)
-        insert_pool_table(connection, pool_data, blockchain_name)
+        insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
 
 if __name__ == '__main__':
     main()
