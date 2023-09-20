@@ -7,10 +7,14 @@ Version: 1.0.1
 import configparser
 from multiprocessing import Pool, Manager
 import os
+# rewrite the imports below. Too unclear
 from init_mevmax_db import create_connection
-from cal_route_data import main as graph_routes_main, load_data, build_graph, get_cal_route_dir, get_tokens, init_graph ,add_edges , get_params, generate_folder, chunk_pairs, process_chunk, create_json, default_serializer, generate_filename, get_routes
+from cal_route_data import main as graph_routes_main, load_data, build_graph, get_cal_route_dir, get_tokens, init_graph, \
+    add_edges, get_params, generate_folder, chunk_pairs, process_chunk, create_json, default_serializer, \
+    generate_filename, get_routes
 from cal_route_data import generate_csv_files
 from cal_route_data import update_pair_flag
+
 
 def main():
     # Read configuration from the INI file
@@ -25,6 +29,7 @@ def main():
     password = config.get('DATABASE', 'password')
     host = config.get('DATABASE', 'host')
     database = config.get('DATABASE', 'database')
+    port = config.get('DATABASE', 'port')
     pool_file = os.path.join(cal_route_dir, config.get('GET_ROUTE_DATA', 'pool_file'))
     pair_file = os.path.join(cal_route_dir, config.get('GET_ROUTE_DATA', 'pair_file'))
     num_holders = config.getint('GET_ROUTE_DATA', 'num_holders')
@@ -41,6 +46,7 @@ def main():
     no_routes_pairs = manager.list()
 
     # Load data and build a graph
+    # Ask generate_csv_files return those two lists
     pools, pairs = load_data()
     graph = build_graph(pools, pairs)
 
@@ -48,12 +54,17 @@ def main():
     blockchain_name, blockchain_id = get_params(pools)
 
     # Determine chunk size based on depth limit and data size
+    # Chunk size can be stored in ini file separated with comma
     if depth_limit == 1:
         chunk_size = 50000
     elif depth_limit == 2:
         chunk_size = 5000
     elif depth_limit == 3:
         chunk_size = 100
+    else:
+        chunk_size = 50
+    # replace with this code
+    # chunk_size = min(chunk_size, len(pairs))
     if len(pairs) < chunk_size:
         chunk_size = len(pairs)
 
@@ -65,8 +76,9 @@ def main():
     chunked_pairs = chunk_pairs(pairs, chunk_size)
 
     with Pool(processes=num_processes) as pool:
-        chunk_params = [(pairs_chunk, depth_limit, blockchain_name, blockchain_id, i + 1, folder_name, graph, no_routes_pairs) for
-                        i, pairs_chunk in enumerate(chunked_pairs)]
+        chunk_params = [
+            (pairs_chunk, depth_limit, blockchain_name, blockchain_id, i + 1, folder_name, graph, no_routes_pairs,
+             min_tvl, num_holders) for i, pairs_chunk in enumerate(chunked_pairs)]
         pool.starmap(process_chunk, chunk_params)
 
     # Save pairs with no routes to a text file
@@ -75,8 +87,9 @@ def main():
         f.write("\n".join(map(str, no_routes_pairs)))
 
     # Create a database connection and update pair flags
-    connection = create_connection(user, password, host, database)
-    update_pair_flag(connection, no_routes_pairs_txt_name)
+    # connection = create_connection(user, password, host, database, port=port)
+    # update_pair_flag(connection, no_routes_pairs_txt_name)
+
 
 if __name__ == '__main__':
     main()

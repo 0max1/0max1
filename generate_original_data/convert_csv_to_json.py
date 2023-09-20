@@ -52,7 +52,7 @@ def pool_convert_csv_to_json(csv_file, output_folder, CAL_DIR):
     json_str = json.dumps(json_data, indent=2)
 
     # Write the JSON data to a file
-    output_path = os.path.join(CAL_DIR, output_folder, "bsc_pool.json")
+    output_path = os.path.join(CAL_DIR, output_folder, "original_data/bsc_pool.json")
     with open(output_path, "w") as json_file:
         json_file.write(json_str)
 
@@ -85,7 +85,7 @@ def token_convert_csv_to_json(csv_file, output_folder, CAL_DIR):
     json_str = json.dumps(json_data, indent=2)
 
     # Write the JSON data to a file
-    output_path = os.path.join(CAL_DIR, output_folder, "bsc_token.json")
+    output_path = os.path.join(CAL_DIR, output_folder, "original_data/bsc_token.json")
     with open(output_path, "w") as json_file:
         json_file.write(json_str)
 

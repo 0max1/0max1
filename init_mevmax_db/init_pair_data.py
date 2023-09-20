@@ -3,24 +3,9 @@ Author: Justin Jia
 Last Updated: August 21, 2023
 Version: 1.0.1
 """
-import threading
-
+from web3 import Web3
 import psycopg2
-from psycopg2.extras import RealDictCursor, execute_batch
-from tqdm import tqdm
 
-# def create_connection():
-#     try:
-#         connection = psycopg2.connect(
-#             user="postgres",
-#             password="1106",
-#             host="localhost",
-#             database="MevMax"
-#         )
-#         return connection
-#     except (Exception, psycopg2.Error) as error:
-#         print("Error while connecting to PostgreSQL", error)
-#         return None
 
 def clear_pair_table(connection):
     """
@@ -29,8 +14,10 @@ def clear_pair_table(connection):
     Args:
         connection (psycopg2.extensions.connection): The database connection object.
     """
+    # Is the situation possible: pair_id in Pool_Pair but not in Pair??????
     try:
         cursor = connection.cursor()
+        # cursor.execute('DELETE FROM "Pool_Pair"')
         cursor.execute('DELETE FROM "Pool_Pair" WHERE pair_id IN (SELECT pair_id FROM "Pair")')
         cursor.execute('DELETE FROM "Pair"')
         connection.commit()
@@ -39,49 +26,58 @@ def clear_pair_table(connection):
     except (Exception, psycopg2.Error) as error:
         print("Error while clearing Pair Table and related Pool_Pair rows", error)
 
+
+def risk_check(connection, holders_pair_flag):
+    with connection.cursor() as cursor:
+        cursor.execute(f'SELECT COUNT(token_address) FROM "Token" WHERE num_holders >= {holders_pair_flag}')
+        tokens_number = cursor.fetchone()[0]
+        if tokens_number > 3000:
+            print("Warning: The total number of pair will be more than 2 millions and this will take a long time")
+            return True
+    return False
+
+
 def insert_pair_table(connection, holders_pair_flag):
     """
     Inserts pairs of tokens into the "Pair" table.
 
     Args:
-        connection (psycopg2.extensions.connection): The database connection object.
+        :param connection: (psycopg2.extensions.connection) The database connection object.
+        :param holders_pair_flag: the minimum number of holder of a "useful" token
     """
-    try:
-        cursor = connection.cursor()
-
-        # Get all token IDs from the Token table
-        cursor.execute('SELECT token_id, token_address FROM "Token" WHERE num_holders >= %s', (holders_pair_flag,))
-        token_ids = [row[0] for row in cursor.fetchall()]
-
-        # Calculate the total number of combinations
-        total_combinations = (len(token_ids) * (len(token_ids) - 1)) // 2
-
-        pairs = set()
-        with tqdm(total=total_combinations, desc="Init Pair Table", unit="pair") as pbar:
-            for i in range(len(token_ids)):
-                for j in range(i + 1, len(token_ids)):
-                    token1_id = token_ids[i]
-                    token2_id = token_ids[j]
-
-                    # Ensure the combination is unique and insert into Pair table
-                    pair = tuple(sorted([token1_id, token2_id]))
-                    if pair not in pairs:
-                        # Check if the pair exists in Pair table
-                        cursor.execute('SELECT pair_id FROM "Pair" WHERE token0_id = %s AND token1_id = %s', (pair[0], pair[1]))
-                        existing_pair = cursor.fetchone()
-
-                        if existing_pair:
-                            pair_id = existing_pair[0]
-                        else:
-                            # Insert a new row into Pair table if the pair doesn't exist
-                            cursor.execute('INSERT INTO "Pair" (token0_id, token1_id) VALUES (%s, %s)', pair)
-                            pairs.add(pair)  # Update the set here to avoid duplicate checks
-                            pbar.update(1)
-
+    if risk_check(connection, holders_pair_flag):
+        return
+    with connection.cursor() as cursor:
+        get_all_pairs = f"""
+            SELECT T1.token_address, T2.token_address
+            FROM "Token" T1 INNER JOIN "Token" T2 ON T1.token_address < T2.token_address
+            WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
+        """
+        cursor.execute(get_all_pairs)
+        pairs = cursor.fetchall()
+        serialize = Web3()
+        # Danger: 1 min 47 s for 897130 pairs
+        # This while loop is for preventing out of memory because this program need to process a lot of pairs
+        i = 0
+        while i < len(pairs):
+            insert_content = ','.join(
+                cursor.mogrify("(%s, %s, %s)",
+                               (serialize.keccak(text=pair[0] + pair[1]).hex(),
+                                pair[0], pair[1])).decode('utf-8') for pair in
+                pairs[i: i + 1000000])
+            cursor.execute('INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
+            i += 1000000
+        cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
         connection.commit()
-        print("Pair Table update complete.")
-    except (Exception, psycopg2.Error) as error:
-        print("Error while updating Pair Table:", error)
+        print("Pair Table initialization complete.")
+        # Web3().keccak(text=tokenA + tokenB)
+        # query = f"""INSERT INTO "Pair" (pair_address)
+        #             SELECT T1.token_id, T2.token_id
+        #             FROM "Token" T1 INNER JOIN "Token" T2 ON T1.token_address < T2.token_address
+        #             WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}"""
+        # cursor.execute(query)
+        # connection.commit()
+        # print("Pair Table update complete.")
 
 # def insert_pair_table(connection):
 #     """

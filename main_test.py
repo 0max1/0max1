@@ -10,7 +10,9 @@ from main import init_db_main, update_db_main, get_route_data_main, get_row_data
 def main():
     # get_row_data_main()
     # init_db_main()
+    # update_db_main()
     get_route_data_main()
+
 
 if __name__ == '__main__':
     main()

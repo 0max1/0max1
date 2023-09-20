@@ -15,6 +15,7 @@ from multiprocessing import Pool, Manager
 
 CAL_ROUTE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def main():
     # Initialize manager for shared data between processes
     manager = Manager()
@@ -35,7 +36,7 @@ def main():
         chunk_size = 500
     elif depth_limit == 2:
         chunk_size = 100
-    elif depth_limit == 3:
+    elif depth_limit >= 3:
         chunk_size = 50
     if len(pairs) < chunk_size:
         chunk_size = len(pairs)
@@ -59,10 +60,13 @@ def main():
     with open(os.path.join(folder_name, f"no_routes_pairs.txt"), "w") as f:
         f.write("\n".join(map(str, no_routes_pairs)))
 
+
 def get_cal_route_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
+
 # Load pool and pair data
+# Warning: if ask generate_csv_file to return pairs and pools, they must be in Dataframe to fit the other code
 def load_data():
     # pools = pd.read_csv('Allpools_tvl_2000.csv')
     # pairs = pd.read_csv('Allpairs-10.csv')
@@ -74,14 +78,18 @@ def load_data():
     pairs = pd.read_csv(pair_data_path)
     return pools, pairs
 
+
 # Build trading graph from pools
 def build_graph(pools, pairs):
     tokens = get_tokens(pairs)
     graph = init_graph(tokens)
     add_edges(graph, pools)
+    # Why dict(graph)??????
     return dict(graph)
 
+
 # Get all tokens
+# Why not access database?????
 def get_tokens(pairs):
     tokens = set()
     for _, row in pairs.iterrows():
@@ -89,12 +97,16 @@ def get_tokens(pairs):
         tokens.add(row['token1_address'])
     return tokens
 
+
 # Initialize empty graph
 def init_graph(tokens):
     graph = defaultdict(list)
+    # The code below can be rewritten to:
+    # return {token: [] for token in tokens}
     for token in tokens:
         graph[token] = []
     return graph
+
 
 # Add edges to graph
 def add_edges(graph, pools):
@@ -107,11 +119,17 @@ def add_edges(graph, pools):
         graph[token0].append((token1, pool_address, protocol_name))
         graph[token1].append((token0, pool_address, protocol_name))
 
+
 # Get blockchain parameters
+# Remember to check the type is. It should be pd.Frame
+# If so, just access database
 def get_params(pools):
     blockchain_name = pools['blockchain_name'].iloc[0]
-    blockchain_id = pools['blockchain_id'].iloc[0]
-    return blockchain_name, blockchain_id
+    # WARNING: blockchain_id may be difference. Reason Unknown!!!!!!!
+    # Possible Reason 1: caused by the change of sample data in initialization
+    # blockchain_id = pools['blockchain_id'].iloc[0]
+    return blockchain_name, 0
+
 
 # Generate output folder path
 def generate_folder(depth_limit, total_pairs, blockchain_name, blockchain_id):
@@ -122,24 +140,32 @@ def generate_folder(depth_limit, total_pairs, blockchain_name, blockchain_id):
     folder_path = os.path.join(results_data_path, folder_name)
     return folder_path
 
+
 # Split pairs into chunks
+# return a list of numpy.ndarray
 def chunk_pairs(pairs, chunk_size=50):
     return np.array_split(pairs, pairs.shape[0] // chunk_size)
 
+
 # Process each chunk
-def process_chunk(pairs_chunk, depth_limit, blockchain_name, blockchain_id, chunk_index, folder_name, graph, no_routes_pairs):
-    data = create_json(pairs_chunk, depth_limit, blockchain_name, blockchain_id, graph, chunk_index, no_routes_pairs)
+def process_chunk(pairs_chunk, depth_limit, blockchain_name, blockchain_id, chunk_index, folder_name, graph,
+                  no_routes_pairs, min_tvl, min_holder):
+    data = create_json(pairs_chunk, depth_limit, blockchain_name, blockchain_id, graph, chunk_index, no_routes_pairs,
+                       min_tvl, min_holder)
 
     filename = os.path.join(folder_name, generate_filename(data, chunk_index))
     with open(filename, 'w') as f:
         json.dump(data, f, indent=4, default=default_serializer)
 
+
 # Generate JSON data for each chunk
-def create_json(pairs, depth_limit, blockchain_name, blockchain_id, graph, chunk_index, no_routes_pairs):
+def create_json(pairs, depth_limit, blockchain_name, blockchain_id, graph, chunk_index, no_routes_pairs,
+                min_tvl, min_holder):
     data = {
         "blockchain_name": blockchain_name,
-        "blockchain_id": blockchain_id,
         "max_depth": depth_limit,
+        "min_tvl": min_tvl,
+        "min_holder": min_holder,
         "total_pairs": len(pairs),
         "total_pairs_find_routes": 0,
         "total_pairs_with_null_routes": 0,
@@ -151,22 +177,24 @@ def create_json(pairs, depth_limit, blockchain_name, blockchain_id, graph, chunk
         pair_id = row.pair_id
         tokenA = row.token0_address
         tokenB = row.token1_address
-        id_hash = Web3().keccak(text=tokenA + tokenB)
+        # id_hash = Web3().keccak(text=tokenA + tokenB)
 
         pair_data = {
-            "id": id_hash.hex(),
+            "id": pair_id,
             "tokens": [tokenA, tokenB],
             "routes": {}
         }
         routes_found = False
         for i in range(1, depth_limit + 1):
+            # when depth = 3, everything calculated when i = 1 will be calculated again
+            # Maybe????? Need to be checked again
             routes = get_routes(tokenA, tokenB, i, graph)
             if routes:
                 pair_data["routes"][f"depth = {i}"] = routes
                 routes_found = True
 
         if not routes_found:
-            no_routes_pairs.append(pair_id)
+            no_routes_pairs.append([pair_id, tokenA, tokenB])
             continue
 
         data["token_pairs"].append(pair_data)
@@ -174,6 +202,7 @@ def create_json(pairs, depth_limit, blockchain_name, blockchain_id, graph, chunk
     data["total_pairs_with_null_routes"] = len(pairs) - len(data["token_pairs"])
 
     return data
+
 
 # JSON serializer
 def default_serializer(o):
@@ -183,19 +212,24 @@ def default_serializer(o):
         return str(o)
     elif isinstance(o, Web3.HexBytes):
         return o.hex()
-    raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+    else:
+        return str(o)
+    # raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+
 
 # Generate file name
 def generate_filename(data, chunk_index):
     blockchain_name = data["blockchain_name"]
-    blockchain_id = data["blockchain_id"]
+    blockchain_id = 0
     max_depth = data["max_depth"]
     total_pairs = data["total_pairs"]
     generated_on = str(data["generated_on"]).split(".")[0]
     generated_on = generated_on.split(" ")[0] + "_" + generated_on.split(" ")[1].replace(":", "-")
     return f"{blockchain_name}_{blockchain_id}_depth_{max_depth}_pairs_{total_pairs}_{generated_on}_chunk_{chunk_index}.json"
 
+
 # Search to find routes
+# If use record, we must check whether we have visited nodes on the given path
 def get_routes(tokenA, tokenB, depth_limit, graph):
     if tokenA not in graph or tokenB not in graph:
         print(f"Either {tokenA} or {tokenB} not in graph. Skipping.")
@@ -204,6 +238,7 @@ def get_routes(tokenA, tokenB, depth_limit, graph):
     visited = set()
 
     def dfs(token, path, pool_addresses, protocols, depth):
+        # check depth < depth_limit first 131
         if token == tokenB and depth == depth_limit:
             route = {'depth': depth,
                      'route_id': len(routes) + 1,

@@ -14,11 +14,11 @@ import os
 CAL_ROUTE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def connect_db(user, password, host, database):
+def connect_db(user, password, host, database, port=5432):
     """
     Connect to the Postgres database
     """
-    connection = psycopg2.connect(user=user, password=password, host=host, dbname=database)
+    connection = psycopg2.connect(user=user, password=password, host=host, dbname=database, port=port)
     return connection
 
 
@@ -30,12 +30,18 @@ def query_to_csv(connection, sql, file_name):
     cursor.execute(sql)
     rows = cursor.fetchall()
 
+    # return rows too. Make sure return them in pd.DataFrame
+
     with open(file_name, 'w') as f:
         writer = csv.writer(f)
         writer.writerow([i[0] for i in cursor.description])
         writer.writerows(rows)
 
 
+# Try to transport the config outside as a parameter. Or meaningless waste
+# The database related parameters has already been read. It can be transport into this function
+# connect_db should be deleted
+# Is Limit necessary?? should we use any other more meaningful limits except num_holders???
 def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num_holders=500, limit=1000, min_tvl=2000):
     """
     Generate CSV files containing pool and pair data
@@ -54,7 +60,7 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
     database = config.get('DATABASE', 'database')
 
     # Connect to database
-    conn = connect_db(user, password, host, database)
+    conn = connect_db(user, password, host, database, port=5433)
 
     # Set output directory
     output_dir = os.path.join(CAL_ROUTE_DIR, 'pairs_pool_data')
@@ -66,6 +72,8 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
     pool_file = os.path.join(output_dir, pool_file)
 
     # Generate pair data
+    # If we can delete the pairs which token becomes "useless", the following query will be easier
+    # Should this add an "order by" if use Limit???
     if limit >= 0:
         pair_sql = \
             f"""
@@ -80,10 +88,10 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
     else:
         pair_sql = \
             f"""
-            SELECT DISTINCT P.pair_id, T1.token_address AS token0_address, T2.token_address AS token1_address
+            SELECT DISTINCT P.pair_address AS pair_id, T1.token_address AS token0_address, T2.token_address AS token1_address
             FROM "Pair" P
-            JOIN "Token" T1 ON P.token0_id = T1.token_id
-            JOIN "Token" T2 ON P.token1_id = T2.token_id
+            JOIN "Token" T1 ON P.token1_address = T1.token_address
+            JOIN "Token" T2 ON P.token2_address = T2.token_address
             WHERE T1.num_holders >= {num_holders}
             AND T2.num_holders >= {num_holders};
             """
@@ -91,6 +99,9 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
     query_to_csv(conn, pair_sql, pair_file)
 
     # Generate pool data
+    # Try this with MySQL to generate temp table. However, such "temp" table must be created with data already in DB
+    # For a single pool, will it has more than one blockchain or protocol????
+    # If no, the big "SELECT DISTINCT" part can be divided again
     pool_sql = \
         f"""
         WITH RankedTokens AS (
@@ -101,16 +112,11 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
           WHERE num_holders >= {num_holders}
         )
         SELECT DISTINCT
-          POOL.pool_address, POOL.tvl, B.blockchain_name, B.blockchain_id,
-          Pr.protocol_name, Pr.protocol_id, 
-          T1.token_address AS token0_address, T2.token_address AS token1_address
-        FROM "Pair" P
-        JOIN "Pool_Pair" PP ON P.pair_id = PP.pair_id
-        JOIN "Pool" POOL ON PP.pool_id = POOL.pool_id
-        JOIN FilteredTokens T1 ON P.token0_id = T1.token_id
-        JOIN FilteredTokens T2 ON P.token1_id = T2.token_id
-        JOIN "BlockChain" B ON POOL.blockchain_id = B.blockchain_id
-        JOIN "Protocol" Pr ON POOL.protocol_id = Pr.protocol_id
+          POOL.pool_address, POOL.tvl, POOL.blockchain_name,
+          POOL.protocol_name, 
+          PP.token1_address AS token0_address, PP.token2_address AS token1_address
+        FROM "Pool_Pair" PP
+        JOIN "Pool" POOL ON PP.pool_address = POOL.pool_address
         WHERE POOL.tvl >= {min_tvl}
         """
 
