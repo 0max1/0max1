@@ -145,6 +145,7 @@ def insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
                                         pool_info[2] >= float(tvl_pool_flag))).decode('utf-8')
                         for pool_info in pool_list)
         cursor.execute('INSERT INTO "Pool" VALUES ' + args)
+        cursor.execute('DROP TABLE IF EXISTS "Temp"')
         cursor.execute(f"""
                     CREATE TABLE IF NOT EXISTS "Temp"(
                         "pool_address" VARCHAR(50),
@@ -154,6 +155,7 @@ def insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
         insert_command = ','.join(cursor.mogrify("(%s, %s)", pool_tokens).decode('utf-8')
                                   for pool_tokens in pool_pair_list)
         cursor.execute('INSERT INTO "Temp" VALUES ' + insert_command)
+
         refill_command = f"""
             INSERT INTO "Token"
             SELECT DISTINCT Te.token_address, '', 18, 0
