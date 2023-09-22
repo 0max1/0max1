@@ -6,6 +6,8 @@ Version: 1.0.1
 
 
 # Function to update the pair_flag in the database
+# maybe need another find_route_pair_ids to update the pairs which flag is false in the last update
+# Actually, what does pair_id mean. Ask this in the meeting and I need answer in Chinese
 def update_pair_flag(connection, filename):
     # Check if database connection is available
     if connection is None:

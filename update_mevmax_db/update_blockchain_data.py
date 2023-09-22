@@ -6,14 +6,20 @@ Version: 1.0.1
 
 import psycopg2
 
+
 # updating BlockChain Table
+# Completely the same as init_blockchain_data
+# Based on update_pool_protocol_poolpair_data.py, this function should return a blockchain_id
+# This function should only update with current blockchain_name to see whether there is new blockchain_name
+# This function is only useful after all chains' data combine in a single database
+# It's not be able to add new blockchain_name into the table
 def update_blockchain_table(connection):
     try:
         cursor = connection.cursor()
 
         sample_data = [
             {"blockchain_name": "Polygon"},
-            {"blockchain_name": "BNB"},
+            {"blockchain_name": "BSC"},
             {"blockchain_name": "ETH"}
         ]
 

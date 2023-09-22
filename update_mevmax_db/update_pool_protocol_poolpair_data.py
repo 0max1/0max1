@@ -7,27 +7,11 @@ Version: 1.0.1
 import json
 import psycopg2
 from tqdm import tqdm
-
-# def create_connection():
-#     try:
-#         connection = psycopg2.connect(
-#             user="postgres",
-#             password="1106",
-#             host="localhost",
-#             database="MevMax"
-#         )
-#         return connection
-#     except (Exception, psycopg2.Error) as error:
-#         print("Error while connecting to PostgreSQL", error)
-#         return None
-
-def read_pool_data(pool_data_path):
-    with open(pool_data_path, "r") as f:
-        data = json.load(f)
-    return data
+from init_mevmax_db.init_pool_protocol_poolpair_data import prepare_pool_data
 
 
 # update protocol
+# duplicate code
 def update_protocol(cursor, connection, protocol_name):
     cursor.execute('SELECT protocol_id FROM "Protocol" WHERE protocol_name = %s', (protocol_name,))
     protocol_id = cursor.fetchone()
@@ -41,7 +25,9 @@ def update_protocol(cursor, connection, protocol_name):
     protocol_id = cursor.fetchone()[0]
     return protocol_id
 
+
 # update blockchain
+# Useless function
 def update_blockchain(cursor, connection, blockchain_name):
     cursor.execute('SELECT blockchain_id FROM "BlockChain" WHERE blockchain_name = %s', (blockchain_name,))
     blockchain_id = cursor.fetchone()
@@ -58,9 +44,11 @@ def update_blockchain(cursor, connection, blockchain_name):
 
     return blockchain_id
 
+
 # update pool
+# nearly the same as init_pool_protocol_poolpair_data.update_pool()
 def update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag):
-    for pool in tqdm(pool_data, total=len(pool_data), desc="Updating Tables", unit="pool"):
+    for pool in tqdm(pool_data, total=len(pool_data), desc="Updating Tables 1", unit="pool"):
         protocol_name = pool["Name"]
         protocol_id = update_protocol(cursor, connection, protocol_name)
 
@@ -68,13 +56,18 @@ def update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag):
         tvl = pool["tvl"]
         fee = pool["fee"]
         pool_flag = False
+        # Unknown use. All pool in the loop should be in the same blockchain_id and this id can be gotten before and
+        # use later as a parameter of this function
         blockchain_id = update_blockchain(cursor, connection, blockchain_name)
 
         cursor.execute('SELECT * FROM "Pool" WHERE pool_address = %s', (pool_address,))
         existing_pool = cursor.fetchone()
+        # The line below and if tvl>=.... can be changed to a single statement. It should be move before the query above
         tvl_pool_flag = float(tvl_pool_flag)
         if tvl >= tvl_pool_flag:
             pool_flag = True
+        # Here maybe we can use Replace or Insert Ignore to combine Update and Insert
+        # See this: https://stackoverflow.com/questions/1361340/how-can-i-do-insert-if-not-exists-in-mysql
         if existing_pool:
             pool_id = existing_pool[0]
             cursor.execute(
@@ -93,12 +86,17 @@ def update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag):
 
         update_pool_pair(cursor, connection, pool_id, pool)
 
+
 # update pool_pair
 def update_pool_pair(cursor, connection, pool_id, pool):
     tokens = []
+    # tokens = [{"token_address": pool.get(f"token{i}", None),
+    #            "token_symbol": pool.get(f"token{i}_symbol", "Unknown"),
+    #            "token_decimals": pool.get(f"token{i}_decimals")} for i in range(1, 9)
+    #           if pool.get(f"token{i}") and pool.get(f"token{i}") != 'null']
     for i in range(1, 9):
         token_address = pool.get(f"token{i}")
-        if token_address:
+        if token_address and token_address != 'null':
             token_symbol = pool.get(f"token{i}_symbol")
             token_decimals = pool.get(f"token{i}_decimals")
 
@@ -116,7 +114,8 @@ def update_pool_pair(cursor, connection, pool_id, pool):
                 })
 
     pairs = set()
-
+    # This version is a little better than init_pool_protocol_poolpair_data function.
+    # However, the basic structure is the same
     for i in range(len(tokens)):
         for j in range(i + 1, len(tokens)):
             cursor.execute('SELECT token_id FROM "Token" WHERE token_address = %s', (tokens[i]["token_address"],))
@@ -176,16 +175,49 @@ def update_pool_pair(cursor, connection, pool_id, pool):
 
 
 def update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
-    try:
-        cursor = connection.cursor()
-        with tqdm(total=len(pool_data), desc="Updating Tables", unit="pool") as pbar:
-            update_pool(cursor, connection, pool_data, blockchain_name, tvl_pool_flag)
-            cursor.close()
-            connection.commit()
-            print("Pool, Protocol, Pool_Pair Tables update complete.")
-    except (Exception, psycopg2.Error) as error:
-        print("Error while updating Pool, Protocol, Pool_Pair Tables", error)
-
+    pool_pair_list, pool_list = prepare_pool_data(connection, pool_data)
+    with connection.cursor() as cursor:
+        args = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s)",
+                                       (pool_info[0], pool_info[1], blockchain_name,
+                                        pool_info[2], pool_info[3],
+                                        pool_info[2] >= float(tvl_pool_flag))).decode('utf-8')
+                        for pool_info in pool_list)
+        cursor.execute('INSERT INTO "Pool" VALUES ' +
+                       args +
+                       ' ON CONFLICT (pool_address) DO UPDATE SET '
+                       'blockchain_name = EXCLUDED.blockchain_name, protocol_name = EXCLUDED.protocol_name, '
+                       'tvl = EXCLUDED.tvl, fee = EXCLUDED.fee, pool_flag = EXCLUDED.pool_flag')
+        cursor.execute('DROP TABLE IF EXISTS "Temp"')
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS "Temp"(
+                "pool_address" VARCHAR(50),
+                "token_address" VARCHAR(50),
+                PRIMARY KEY (pool_address, token_address))
+        """)
+        insert_command = ','.join(cursor.mogrify("(%s, %s)", pool_tokens).decode('utf-8')
+                                  for pool_tokens in pool_pair_list)
+        cursor.execute('INSERT INTO "Temp" VALUES ' + insert_command)
+        clear_command = f"""
+            DELETE FROM "Pool_Pair" WHERE pool_address IN (SELECT DISTINCT pool_address FROM "Temp")
+        """
+        cursor.execute(clear_command)
+        refill_command = f"""
+                    INSERT INTO "Token"
+                    SELECT DISTINCT Te.token_address, '', 18, 0
+                    FROM "Temp" as Te
+                    ON CONFLICT DO NOTHING
+                """
+        cursor.execute(refill_command)
+        pool_pair_command = f"""
+                            INSERT INTO "Pool_Pair"
+                            SELECT T1.pool_address, T1.token_address, T2.token_address
+                            FROM "Temp" T1
+                            JOIN "Temp" T2 ON T1.pool_address = T2.pool_address AND T1.token_address < T2.token_address
+                        """
+        cursor.execute(pool_pair_command)
+        cursor.execute('DROP TABLE IF EXISTS "Temp"')
+        connection.commit()
+        print("Pool, Protocol, Pool_Pair Tables update complete.")
 
 # if __name__ == "__main__":
 #     connection = create_connection()
