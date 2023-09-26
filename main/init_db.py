@@ -5,6 +5,7 @@ Version: 1.0.1
 """
 
 import configparser
+import json
 import os
 from datetime import datetime
 
@@ -69,6 +70,37 @@ def main():
 
         # Init the pool, protocol, and pool_pair data. Update the blockchain data
         pool_data = read_json_data(pool_data_path)
+        # print(len(pool_data))
+        # record = dict()
+        # duplicate_count = dict()
+        # for pool in pool_data:
+        #     if pool['pool_address'] not in record:
+        #         record[pool['pool_address']] = [pool]
+        #         duplicate_count[pool['pool_address']] = 1
+        #     else:
+        #         duplicate_count[pool['pool_address']] += 1
+        #         all_new = True
+        #         for old in record[pool['pool_address']]:
+        #             temp_new = False
+        #             for key in pool:
+        #                 if key not in old or pool[key] != old[key]:
+        #                     temp_new = True
+        #                     break
+        #             all_new = all_new and temp_new
+        #             if not all_new:
+        #                 break
+        #         if all_new:
+        #             record[pool['pool_address']].append(pool)
+        # final_result = []
+        # for pool_address in list(duplicate_count.keys()):
+        #     if duplicate_count[pool_address] > 1:
+        #         duplicate_sit = {'pool_address': pool_address, 'duplicate_case_num': duplicate_count[pool_address],
+        #                          'different_cases_num': len(record[pool_address]),
+        #                          'different_cases': record[pool_address]}
+        #         final_result.append(duplicate_sit)
+        # print(len(final_result))
+        # with open('check_result.json', 'w+') as f:
+        #     json.dump(final_result, f, indent=4)
         insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
 
 

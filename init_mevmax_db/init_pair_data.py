@@ -45,8 +45,8 @@ def insert_pair_table(connection, holders_pair_flag):
         :param connection: (psycopg2.extensions.connection) The database connection object.
         :param holders_pair_flag: the minimum number of holder of a "useful" token
     """
-    if risk_check(connection, holders_pair_flag):
-        return
+    # if risk_check(connection, holders_pair_flag):
+    #     return
     with connection.cursor() as cursor:
         get_all_pairs = f"""
             SELECT T1.token_address, T2.token_address
@@ -63,10 +63,10 @@ def insert_pair_table(connection, holders_pair_flag):
             insert_content = ','.join(
                 cursor.mogrify("(%s, %s, %s)",
                                (serialize.keccak(text=pair[0] + pair[1]).hex(),
-                                pair[0], pair[1])).decode('utf-8') for pair in
-                pairs[i: i + 1000000])
+                                pair[0], pair[1])).decode('utf-8') for pair in pairs[i: i + 1000000])
             cursor.execute('INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
             i += 1000000
+            print("Pair Processed: ", i)
         cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
         connection.commit()
         print("Pair Table initialization complete.")

@@ -38,11 +38,10 @@ class ConfigReader:
                self.config.get('UPDATE_DB', 'holders_pair_flag')
 
     def getRouteInfo(self):
-        return self.config.get('GET_ROUTE_DATA', 'pool_file'), self.config.get('GET_ROUTE_DATA', 'pair_file'), \
-               self.config.getint('GET_ROUTE_DATA', 'num_holders'), \
+        return self.config.getint('GET_ROUTE_DATA', 'num_holders'), \
                self.config.getint('GET_ROUTE_DATA', 'pairs_limit'), self.config.getint('GET_ROUTE_DATA', 'min_tvl'), \
                self.config.getint('GET_ROUTE_DATA', 'depth_limit'), \
-               self.config.getint('GET_ROUTE_DATA', 'num_processes')
+               self.config.getint('GET_ROUTE_DATA', 'num_processes'), self.config.getint('GET_ROUTE_DATA', 'max_route')
 
 
 def create_connection(user, password, host, database, port=5432):
