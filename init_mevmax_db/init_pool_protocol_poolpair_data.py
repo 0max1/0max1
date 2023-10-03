@@ -137,7 +137,7 @@ def insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
            :param connection: (psycopg2.extensions.connection) The database connection object.
            :param tvl_pool_flag: (int) the minimum value of tvl of a "useful" pool
     """
-    pool_pair_list, pool_list = prepare_pool_data(connection, pool_data)
+    pool_pair_list, pool_list, token_set = prepare_pool_data(connection, pool_data)
     with connection.cursor() as cursor:
         args = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s)",
                                        (pool_info[0], pool_info[1], blockchain_name,
@@ -145,32 +145,35 @@ def insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
                                         pool_info[2] >= float(tvl_pool_flag))).decode('utf-8')
                         for pool_info in pool_list)
         cursor.execute('INSERT INTO "Pool" VALUES ' + args)
-        cursor.execute('DROP TABLE IF EXISTS "Temp"')
-        cursor.execute(f"""
-                    CREATE TABLE IF NOT EXISTS "Temp"(
-                        "pool_address" VARCHAR(50),
-                        "token_address" VARCHAR(50),
-                        PRIMARY KEY (pool_address, token_address))
-                    """)
+        # cursor.execute('DROP TABLE IF EXISTS "Temp"')
+        # cursor.execute(f"""
+        #             CREATE TABLE IF NOT EXISTS "Temp"(
+        #                 "pool_address" VARCHAR(50),
+        #                 "token_address" VARCHAR(50),
+        #                 PRIMARY KEY (pool_address, token_address))
+        #             """)
+        refill_command = ','.join(cursor.mogrify("(%s, %s, %s, %s)", (token, '', 18, 0)).decode('utf-8')
+                                  for token in token_set)
+        cursor.execute('INSERT INTO "Token" VALUES ' + refill_command + ' ON CONFLICT DO NOTHING')
         insert_command = ','.join(cursor.mogrify("(%s, %s)", pool_tokens).decode('utf-8')
                                   for pool_tokens in pool_pair_list)
-        cursor.execute('INSERT INTO "Temp" VALUES ' + insert_command)
+        cursor.execute('INSERT INTO "Pool_Token" VALUES ' + insert_command)
 
-        refill_command = f"""
-            INSERT INTO "Token"
-            SELECT DISTINCT Te.token_address, '', 18, 0
-            FROM "Temp" as Te
-            ON CONFLICT DO NOTHING
-        """
-        cursor.execute(refill_command)
-        pool_pair_command = f"""
-                    INSERT INTO "Pool_Pair"
-                    SELECT T1.pool_address, T1.token_address, T2.token_address
-                    FROM "Temp" T1
-                    JOIN "Temp" T2 ON T1.pool_address = T2.pool_address AND T1.token_address < T2.token_address
-                """
-        cursor.execute(pool_pair_command)
-        cursor.execute('DROP TABLE IF EXISTS "Temp"')
+        # refill_command = f"""
+        #     INSERT INTO "Token"
+        #     SELECT DISTINCT Te.token_address, '', 18, 0
+        #     FROM "Temp" as Te
+        #     ON CONFLICT DO NOTHING
+        # """
+        # cursor.execute(refill_command)
+        # pool_pair_command = f"""
+        #             INSERT INTO "Pool_Pair"
+        #             SELECT T1.pool_address, T1.token_address, T2.token_address
+        #             FROM "Temp" T1
+        #             JOIN "Temp" T2 ON T1.pool_address = T2.pool_address AND T1.token_address < T2.token_address
+        #         """
+        # cursor.execute(pool_pair_command)
+        # cursor.execute('DROP TABLE IF EXISTS "Temp"')
         connection.commit()
         print("Pool, Protocol, Pool_Pair Tables Init complete.")
     # try:
@@ -199,7 +202,7 @@ def prepare_pool_data(connection, pool_data):
             i += 1
         pool_list.append(pool_info)
     insert_protocol_table(connection, list(protocols))
-    return pool_pair_list, pool_list
+    return pool_pair_list, pool_list, tokens
 
 
 def insert_protocol_table(connection, protocols):

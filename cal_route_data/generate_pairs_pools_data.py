@@ -14,6 +14,49 @@ import os
 CAL_ROUTE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+def get_pairs(connection, min_holders, limit, offset):
+    with connection.cursor() as cursor:
+        search_command = f"""
+            SELECT P.pair_address, T1.token_address, T2.token_address
+            FROM "Pair" P
+            JOIN "Token" T1 ON P.token1_address = T1.token_address
+            JOIN "Token" T2 ON P.token2_address = T2.token_address
+            WHERE T1.num_holders >= {min_holders}
+            AND T2.num_holders >= {min_holders}
+            ORDER BY P.pair_address
+            LIMIT {limit} OFFSET {offset}
+        """
+        cursor.execute(search_command)
+        return cursor.fetchall()
+
+
+def get_pool_pairs(connection, min_tvl, min_holder):
+    with connection.cursor() as cursor:
+        search_command = f"""
+            SELECT DISTINCT PO.pool_address, PO.protocol_name, PT1.token_address, PT2.token_address
+            FROM "Pool_Token" PT1
+            JOIN "Pool_Token" PT2 ON PT1.pool_address = PT2.pool_address AND PT1.token_address < PT2.token_address
+            JOIN "Pool" PO ON PO.pool_address = PT1.pool_address
+            WHERE PO.tvl >= {min_tvl}
+        """
+        cursor.execute(search_command)
+        graph_draft = cursor.fetchall()
+        cursor.execute(f"""
+            SELECT COUNT(T1.token_address)
+            FROM "Token" T1
+            JOIN "Token" T2 ON T1.token_address < T2.token_address
+            WHERE T1.num_holders >= {min_holder} AND T2.num_holders >= {min_holder}
+        """)
+        print("Graph Data Collected")
+        return graph_draft, cursor.fetchone()[0]
+
+
+def get_blockchain_name(connection):
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT blockchain_name FROM "Pool" LIMIT 1')
+        return cursor.fetchone()[0]
+
+
 def connect_db(user, password, host, database, port=5432):
     """
     Connect to the Postgres database
@@ -121,7 +164,6 @@ def generate_csv_files(pool_file='pool_data.csv', pair_file='pair_data.csv', num
         """
 
     query_to_csv(conn, pool_sql, pool_file)
-
 
 # if __name__ == '__main__':
 #     parser = argparse.ArgumentParser()

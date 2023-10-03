@@ -41,7 +41,8 @@ class ConfigReader:
         return self.config.getint('GET_ROUTE_DATA', 'num_holders'), \
                self.config.getint('GET_ROUTE_DATA', 'pairs_limit'), self.config.getint('GET_ROUTE_DATA', 'min_tvl'), \
                self.config.getint('GET_ROUTE_DATA', 'depth_limit'), \
-               self.config.getint('GET_ROUTE_DATA', 'num_processes'), self.config.getint('GET_ROUTE_DATA', 'max_route')
+               self.config.getint('GET_ROUTE_DATA', 'num_processes'), \
+               self.config.getint('GET_ROUTE_DATA', 'max_route'), self.config.getint('GET_ROUTE_DATA', 'chunk_size')
 
 
 def create_connection(user, password, host, database, port=5432):
@@ -80,6 +81,9 @@ def drop_tables(connection):
     """
     commands = (
         """
+        DROP TABLE IF EXISTS "Pool_Token"
+        """,
+        """
         DROP TABLE IF EXISTS "Pool_Pair"
         """,
         """
@@ -102,7 +106,7 @@ def drop_tables(connection):
         """,
         """
         DROP TABLE IF EXISTS "pool"
-        """,
+        """
     )
     with connection.cursor() as cursor:
         for command in commands:
@@ -158,7 +162,7 @@ def create_tables(connection):
                 "token1_address" VARCHAR(50) REFERENCES "Token"("token_address"),
                 "token2_address" VARCHAR(50) REFERENCES "Token"("token_address"),
                 "routes_data" VARCHAR(255),
-                "pair_flag" BOOLEAN DEFAULT TRUE
+                "pair_flag" BOOLEAN DEFAULT FALSE
             )
         """)
         # Create "Pool"
@@ -174,12 +178,10 @@ def create_tables(connection):
         """)
         # Create "Pool_Pair"
         cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS "Pool_Pair" (
+                CREATE TABLE IF NOT EXISTS "Pool_Token" (
                 "pool_address" VARCHAR(50) NOT NULL REFERENCES "Pool"("pool_address"),
-                "token1_address" VARCHAR(50) NOT NULL REFERENCES "Token"("token_address"),
-                "token2_address" VARCHAR(50) NOT NULL REFERENCES "Token"("token_address"),
-                PRIMARY KEY (pool_address, token1_address, token2_address),
-                CHECK (token1_address < token2_address)
+                "token_address" VARCHAR(50) NOT NULL REFERENCES "Token"("token_address"),
+                PRIMARY KEY (pool_address, token_address)
             )
         """)
         connection.commit()
