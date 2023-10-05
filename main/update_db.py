@@ -17,21 +17,9 @@ import configparser
 
 
 def main():
-    start = datetime.now()
     # Load configuration from mevmax_config.ini
     config = ConfigReader()
     user, password, host, database, port = config.getDatabaseInfo()
-    # config = configparser.ConfigParser()
-    # base_path = os.path.dirname(os.path.abspath(__file__))
-    # ini_path = os.path.join(base_path, "..", "config", "mevmax_config.ini")
-    # config.read(ini_path)
-    #
-    # # Extract database connection parameters from the configuration
-    # user = config.get('DATABASE', 'user')
-    # password = config.get('DATABASE', 'password')
-    # host = config.get('DATABASE', 'host')
-    # database = config.get('DATABASE', 'database')
-    # port = config.get('DATABASE', 'port')
 
     # Create a connection to the PostgreSQL database
     connection = create_connection(user, password, host, database, port=port)
@@ -62,8 +50,19 @@ def main():
         pool_data = read_json_data(pool_data_path)
         # pool_data = read_pool_data(pool_data_path)
         update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
-        print(datetime.now() - start)
-        print("Test End")
+
+
+def update_db(token_data, pool_data, database_name=''):
+    config = ConfigReader()
+    user, password, host, database, port = config.getDatabaseInfo()
+    if database_name in ['ETH', 'Bsc', 'Polygon']:
+        database = database_name
+    connection = create_connection(user, password, host, database, port=port)
+    token_data_path, pool_data_path, blockchain_name, tvl_pool_flag, holders_pair_flag = config.getUpdateInfo()
+    if connection:
+        update_token_table(connection, token_data)
+        update_pair_table(connection, holders_pair_flag)
+        update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
 
 
 if __name__ == '__main__':

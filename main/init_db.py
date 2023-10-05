@@ -104,5 +104,21 @@ def main():
         insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
 
 
+def initialize_db(token_data, pool_data, database_name=''):
+    ini_reader = ConfigReader()
+    user, password, host, database, port = ini_reader.getDatabaseInfo()
+    if database_name in ['ETH', 'Bsc', 'Polygon']:
+        database = database_name
+    connection = create_connection(user, password, host, database, port=port)
+    token_data_path, pool_data_path, blockchain_name, tvl_pool_flag, holders_pair_flag = ini_reader.getInitInfo()
+    if connection:
+        drop_tables(connection)
+        create_tables(connection)
+        initialize_blockchain_table(connection)
+        insert_token_table(connection, token_data)
+        insert_pair_table(connection, holders_pair_flag)
+        insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
+
+
 if __name__ == '__main__':
     main()

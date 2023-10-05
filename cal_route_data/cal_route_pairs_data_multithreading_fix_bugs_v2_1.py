@@ -81,8 +81,8 @@ def create_result(data, folder_name, chunk_index, has_routes, cursor, folder_nam
     file_name = generate_filename(data, chunk_index)
     filename = os.path.join(folder_name, file_name)
     file_name = os.path.join(folder_name_s, file_name)
-    args = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s)",
-                                   (pair_address[0], pair_address[1], pair_address[2], file_name, True)).decode('utf-8')
+    args = ','.join(cursor.mogrify("(%s, %s)",
+                                   (pair_address, file_name)).decode('utf-8')
                     for pair_address in has_routes)
     cursor.execute('INSERT INTO "Pair_Temp" VALUES ' + args)
     # cursor.execute(f"""
@@ -127,16 +127,13 @@ def build_graph(pools):
 def build_temp(connection):
     with connection.cursor() as cursor:
         # cursor.execute('UPDATE "Pair" SET pair_flag = FALSE')
-        print("All flags initialized")
+        # print("All flags initialized")
         cursor.execute('DROP TABLE IF EXISTS "Pair_Temp"')
         cursor.execute(f"""
-                    CREATE TABLE IF NOT EXISTS "Pair_Temp" (
-                        "pair_address" VARCHAR(100) PRIMARY KEY,
-                        "token1_address" VARCHAR(50) REFERENCES "Token"("token_address"),
-                        "token2_address" VARCHAR(50) REFERENCES "Token"("token_address"),
-                        "routes_data" VARCHAR(255),
-                        "pair_flag" BOOLEAN DEFAULT FALSE
-                    )
+            CREATE TABLE IF NOT EXISTS "Pair_Temp" (
+                "pair_address" VARCHAR(100) PRIMARY KEY,
+                "routes_data" VARCHAR(255)
+            )
         """)
         connection.commit()
         print("Temp Table Created")

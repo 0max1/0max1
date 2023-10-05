@@ -30,27 +30,56 @@ def update_pair_table(connection, holders_pair_flag):
     # This might be a faster way: create a temp table to accommodate those new tokens.
     # Inserting new pairs with joining, and then delete this temp table
     with connection.cursor() as cursor:
-        getNewTokens = f"""
-            SELECT T1.token_address, T2.token_address
-            FROM "Token" T1 
-            JOIN "Token" T2 ON T1.token_address < T2.token_address
-            WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag} 
-            AND (T1.is_new OR T2.is_new)
-        """
-        cursor.execute(getNewTokens)
-        pairs = cursor.fetchall()
-        print(f"{len(pairs)} new pairs is added")
+        update_offset = 0
         serialize = Web3()
-        i = 0
-        while i < len(pairs):
-            insert_content = ','.join(
-                cursor.mogrify("(%s)", (serialize.keccak(text=pair[0] + pair[1]).hex(),)).decode('utf-8') for pair in
-                pairs[i: i + 1000000])
+        while True:
+            getNewTokens = f"""
+                SELECT T1.token_address, T2.token_address
+                FROM "Token" T1 
+                JOIN "Token" T2 ON T1.token_address < T2.token_address
+                WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag} 
+                AND (T1.is_new OR T2.is_new)
+                ORDER BY T1.token_address ASC, T2.token_address ASC
+                LIMIT 2000000 OFFSET {update_offset}
+            """
+            cursor.execute(getNewTokens)
+            pairs = cursor.fetchall()
+            if len(pairs) == 0:
+                print("No more new pairs")
+                break
+            else:
+                print("Updating", len(pairs), "new pairs")
+            insert_content = ','.join(cursor.mogrify("(%s)",
+                                                     (serialize.keccak(text=pair[0] + pair[1]).hex(),)).decode('utf-8')
+                                      for pair in pairs)
             cursor.execute('INSERT INTO "Pair" (pair_address) VALUES ' + insert_content + ' ON CONFLICT DO NOTHING')
-            i += 1000000
-        cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
+            update_offset += 2000000
+        cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE is_new AND num_holders >= {holders_pair_flag}')
         connection.commit()
         print("Pair Table update complete.")
+
+    # with connection.cursor() as cursor:
+    #     getNewTokens = f"""
+    #         SELECT T1.token_address, T2.token_address
+    #         FROM "Token" T1
+    #         JOIN "Token" T2 ON T1.token_address < T2.token_address
+    #         WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
+    #         AND (T1.is_new OR T2.is_new)
+    #     """
+    #     cursor.execute(getNewTokens)
+    #     pairs = cursor.fetchall()
+    #     print(f"{len(pairs)} new pairs is added")
+    #     serialize = Web3()
+    #     i = 0
+    #     while i < len(pairs):
+    #         insert_content = ','.join(
+    #             cursor.mogrify("(%s)", (serialize.keccak(text=pair[0] + pair[1]).hex(),)).decode('utf-8') for pair in
+    #             pairs[i: i + 1000000])
+    #         cursor.execute('INSERT INTO "Pair" (pair_address) VALUES ' + insert_content + ' ON CONFLICT DO NOTHING')
+    #         i += 1000000
+    #     cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
+    #     connection.commit()
+    #     print("Pair Table update complete.")
 
 
 # if __name__ == "__main__":

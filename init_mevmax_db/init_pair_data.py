@@ -27,16 +27,6 @@ def clear_pair_table(connection):
         print("Error while clearing Pair Table and related Pool_Pair rows", error)
 
 
-def risk_check(connection, holders_pair_flag):
-    with connection.cursor() as cursor:
-        cursor.execute(f'SELECT COUNT(token_address) FROM "Token" WHERE num_holders >= {holders_pair_flag}')
-        tokens_number = cursor.fetchone()[0]
-        if tokens_number > 3000:
-            print("Warning: The total number of pair will be more than 2 millions and this will take a long time")
-            return True
-    return False
-
-
 def insert_pair_table(connection, holders_pair_flag):
     """
     Inserts pairs of tokens into the "Pair" table.
@@ -45,39 +35,57 @@ def insert_pair_table(connection, holders_pair_flag):
         :param connection: (psycopg2.extensions.connection) The database connection object.
         :param holders_pair_flag: the minimum number of holder of a "useful" token
     """
-    # if risk_check(connection, holders_pair_flag):
-    #     return
     with connection.cursor() as cursor:
-        get_all_pairs = f"""
-            SELECT T1.token_address, T2.token_address
-            FROM "Token" T1 INNER JOIN "Token" T2 ON T1.token_address < T2.token_address
-            WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
-        """
-        cursor.execute(get_all_pairs)
-        pairs = cursor.fetchall()
         serialize = Web3()
-        # Danger: 1 min 47 s for 897130 pairs
-        # This while loop is for preventing out of memory because this program need to process a lot of pairs
-        i = 0
-        while i < len(pairs):
-            insert_content = ','.join(
-                cursor.mogrify("(%s, %s, %s)",
-                               (serialize.keccak(text=pair[0] + pair[1]).hex(),
-                                pair[0], pair[1])).decode('utf-8') for pair in pairs[i: i + 1000000])
-            cursor.execute('INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
-            i += 1000000
-            print("Pair Processed: ", i)
+        cursor.execute(f'SELECT COUNT(*) FROM "Token" WHERE num_holders >= {holders_pair_flag}')
+        pair_size = cursor.fetchone()[0]
+        pair_size = pair_size * (pair_size - 1) / 2
+        offset = 0
+        while offset < pair_size:
+            cursor.execute(f"""
+                SELECT T1.token_address, T2.token_address
+                FROM "Token" T1
+                JOIN "Token" T2 ON T1.token_address < T2.token_address
+                WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
+                ORDER BY T1.token_address ASC, T2.token_address ASC
+                LIMIT 2000000 OFFSET {offset}
+            """)
+            pairs = cursor.fetchall()
+            if len(pairs) > 0:
+                insert_content = ','.join(cursor.mogrify("(%s, %s, %s)",
+                                                         (serialize.keccak(text=pair[0] + pair[1]).hex(),
+                                                          pair[0], pair[1])).decode('utf-8') for pair in pairs)
+                cursor.execute(
+                    'INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
+            offset += 2000000
+            print(f"~{offset} pairs have been inserted")
         cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
         connection.commit()
         print("Pair Table initialization complete.")
-        # Web3().keccak(text=tokenA + tokenB)
-        # query = f"""INSERT INTO "Pair" (pair_address)
-        #             SELECT T1.token_id, T2.token_id
-        #             FROM "Token" T1 INNER JOIN "Token" T2 ON T1.token_address < T2.token_address
-        #             WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}"""
-        # cursor.execute(query)
-        # connection.commit()
-        # print("Pair Table update complete.")
+
+    # with connection.cursor() as cursor:
+    #     get_all_pairs = f"""
+    #         SELECT T1.token_address, T2.token_address
+    #         FROM "Token" T1 INNER JOIN "Token" T2 ON T1.token_address < T2.token_address
+    #         WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
+    #     """
+    #     cursor.execute(get_all_pairs)
+    #     pairs = cursor.fetchall()
+    #     serialize = Web3()
+    #     # Danger: 1 min 47 s for 897130 pairs
+    #     # This while loop is for preventing out of memory because this program need to process a lot of pairs
+    #     i = 0
+    #     while i < len(pairs):
+    #         insert_content = ','.join(
+    #             cursor.mogrify("(%s, %s, %s)",
+    #                            (serialize.keccak(text=pair[0] + pair[1]).hex(),
+    #                             pair[0], pair[1])).decode('utf-8') for pair in pairs[i: i + 1000000])
+    #         cursor.execute('INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
+    #         i += 1000000
+    #         print("Pair Processed: ", i)
+    #     cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
+    #     connection.commit()
+    #     print("Pair Table initialization complete.")
 
 # def insert_pair_table(connection):
 #     """

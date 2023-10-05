@@ -19,13 +19,15 @@ from cal_route_data.generate_pairs_pools_data import get_pairs, get_pool_pairs, 
 from cal_route_data.cal_route_pairs_data_multithreading_fix_bugs_v2_1 import build_graph, get_pair_routes, \
     generate_folder, chunk_pairs, create_result, build_temp
 from init_mevmax_db.create_mevmax_db import ConfigReader
+from update_mevmax_db.update_token_pair_data import update_pair_table
 
 
 # 1 hour 9 min (14 million, no any database update)
 # 2 hours 11 min （14132586, old update algorithm, has pair_flag initialization）
 # 15 min 22 seconds (14 million, new update algorithm, no pair_flag initialization)
 # 1 hour 4 min (14 million, new update algorithm, has pair_flag initialization, Update -> Insert)
-# ??? (14 million, new update algorithm, has pair_flag initialization, Batch Insert)
+# 2 hours 23 minutes (14 million, new update algorithm, has pair_flag initialization, Batch Insert, Batch commit)
+# 24 minutes 53 seconds (14 million, new update algorithm, has pair_flag initialization, Batch Insert)
 def main():
     # Read configuration from the INI file
     config = ConfigReader()
@@ -88,7 +90,7 @@ def main():
         has_routes = []
         with connection.cursor() as cursor:
             for i in range(len(routes_pairs)):
-                has_routes.append((routes_pairs[i]['id'], routes_pairs[i]['tokens'][0], routes_pairs[i]['tokens'][1]))
+                has_routes.append(routes_pairs[i]['id'])
                 current_route_num += routes_pairs[i]['routes_num']
                 if current_route_num >= max_route or i == len(routes_pairs) - 1:
                     routes_results = {
@@ -111,27 +113,29 @@ def main():
         offset += pairs_limit
         print(f'Results Generated in {file_index - old_file_index} Files')
         old_file_index = file_index
+    print("Updating Results to Database")
+    # insert_offset = 0
+    # print("Moving Pairs")
     with connection.cursor() as cursor:
-        insert_offset = 0
-        print("Moving Pairs")
-        while insert_offset < pair_size:
-            cursor.execute(f"""
-                INSERT INTO "Pair_Temp" (pair_address, token1_address, token2_address, routes_data)
-                SELECT pair_address, token1_address, token2_address, routes_data FROM "Pair"
-                ORDER BY pair_address
-                LIMIT 1000000 OFFSET {insert_offset}
-                ON CONFLICT DO NOTHING
-            """)
-            insert_offset += 1000000
-            print("# of Moved Pairs", insert_offset)
-        # cursor.execute(f"""
-        #     UPDATE "Pair" P
-        #     SET pair_flag = TRUE, routes_data = T.file_loc
-        #     FROM "Pair_Temp" T
-        #     WHERE P.pair_address = T.pair_address
-        # """)
-        cursor.execute('DROP TABLE IF EXISTS "Pair"')
-        cursor.execute('ALTER TABLE "Pair_Temp" RENAME TO "Pair"')
+        # while insert_offset < pair_size:
+        #     cursor.execute(f"""
+        #         INSERT INTO "Pair_Temp" (pair_address, token1_address, token2_address, routes_data)
+        #         SELECT pair_address, token1_address, token2_address, routes_data FROM "Pair"
+        #         ORDER BY pair_address
+        #         LIMIT 1000000 OFFSET {insert_offset}
+        #         ON CONFLICT DO NOTHING
+        #     """)
+        #     insert_offset += 1000000
+        #     print("# of Moved Pairs", insert_offset)
+        cursor.execute(f"""
+            UPDATE "Pair" P
+            SET pair_flag = TRUE, routes_data = T.routes_data
+            FROM "Pair_Temp" T
+            WHERE P.pair_address = T.pair_address
+        """)
+        cursor.execute('DROP TABLE IF EXISTS "Pair_Temp"')
+        # cursor.execute('DROP TABLE IF EXISTS "Pair"')
+        # cursor.execute('ALTER TABLE "Pair_Temp" RENAME TO "Pair"')
         connection.commit()
 
 
