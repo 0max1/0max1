@@ -1,7 +1,7 @@
 """
-Author: Justin Jia
-Last Updated: August 21, 2023
-Version: 1.0.1
+Author: Justin Jia, Zhenhao Lu
+Last Updated: October 14, 2023
+Version: 1.0.2
 """
 
 import psycopg2

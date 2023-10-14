@@ -32,30 +32,21 @@ def main():
     token_data_path = os.path.join(cal_route_dir, token_data_path)
     pool_data_path = os.path.join(cal_route_dir, pool_data_path)
 
-    # Extract blockchain name from the configuration for update
-    # blockchain_name = config.get('UPDATE_DB', 'blockchain_name')
-    # tvl_pool_flag = config.get('UPDATE_DB', 'tvl_pool_flag')
-    # holders_pair_flag = config.get('UPDATE_DB', 'holders_pair_flag')
-
     if connection:
         # Update the token data
         token_data = read_json_data(token_data_path)
-        # token_data = read_token_data(token_data_path)
         update_token_table(connection, token_data)
         # Update the pair data (insert all combinations between existence tokens)
         update_pair_table(connection, holders_pair_flag)
-        # Update the blockchain data
-        # update_blockchain_table(connection)
-        # Update the pool, protocol, and pool_pair data. Update the blockchain data
+        # Update pool data
         pool_data = read_json_data(pool_data_path)
-        # pool_data = read_pool_data(pool_data_path)
         update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
 
 
 def update_db(token_data, pool_data, database_name=''):
     config = ConfigReader()
     user, password, host, database, port = config.getDatabaseInfo()
-    if database_name in ['ETH', 'Bsc', 'Polygon']:
+    if database_name in ['ETH', 'BSC', 'Polygon']:
         database = database_name
     connection = create_connection(user, password, host, database, port=port)
     token_data_path, pool_data_path, blockchain_name, tvl_pool_flag, holders_pair_flag = config.getUpdateInfo()

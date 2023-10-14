@@ -4,27 +4,27 @@ Last Updated: August 21, 2023
 Version: 1.0.1
 """
 from web3 import Web3
-import psycopg2
+# import psycopg2
 
 
-def clear_pair_table(connection):
-    """
-    Clears the "Pair" table and related rows in the "Pool_Pair" table.
-
-    Args:
-        connection (psycopg2.extensions.connection): The database connection object.
-    """
-    # Is the situation possible: pair_id in Pool_Pair but not in Pair??????
-    try:
-        cursor = connection.cursor()
-        # cursor.execute('DELETE FROM "Pool_Pair"')
-        cursor.execute('DELETE FROM "Pool_Pair" WHERE pair_id IN (SELECT pair_id FROM "Pair")')
-        cursor.execute('DELETE FROM "Pair"')
-        connection.commit()
-        print("Pair Table and related Pool_Pair rows cleared.")
-        cursor.close()
-    except (Exception, psycopg2.Error) as error:
-        print("Error while clearing Pair Table and related Pool_Pair rows", error)
+# def clear_pair_table(connection):
+#     """
+#     Clears the "Pair" table and related rows in the "Pool_Pair" table.
+#
+#     Args:
+#         connection (psycopg2.extensions.connection): The database connection object.
+#     """
+#     # Is the situation possible: pair_id in Pool_Pair but not in Pair??????
+#     try:
+#         cursor = connection.cursor()
+#         # cursor.execute('DELETE FROM "Pool_Pair"')
+#         cursor.execute('DELETE FROM "Pool_Pair" WHERE pair_id IN (SELECT pair_id FROM "Pair")')
+#         cursor.execute('DELETE FROM "Pair"')
+#         connection.commit()
+#         print("Pair Table and related Pool_Pair rows cleared.")
+#         cursor.close()
+#     except (Exception, psycopg2.Error) as error:
+#         print("Error while clearing Pair Table and related Pool_Pair rows", error)
 
 
 def insert_pair_table(connection, holders_pair_flag):
@@ -37,10 +37,13 @@ def insert_pair_table(connection, holders_pair_flag):
     """
     with connection.cursor() as cursor:
         serialize = Web3()
+        # Estimate the number of pairs
         cursor.execute(f'SELECT COUNT(*) FROM "Token" WHERE num_holders >= {holders_pair_flag}')
         pair_size = cursor.fetchone()[0]
         pair_size = pair_size * (pair_size - 1) / 2
         offset = 0
+        # Process 2000000 pairs in an iteration. "ORDER BY" is necessary
+        # Extract all possible pairs from Token Table
         while offset < pair_size:
             cursor.execute(f"""
                 SELECT T1.token_address, T2.token_address
@@ -51,6 +54,7 @@ def insert_pair_table(connection, holders_pair_flag):
                 LIMIT 2000000 OFFSET {offset}
             """)
             pairs = cursor.fetchall()
+            # Compute their pair_address with keccak-256
             if len(pairs) > 0:
                 insert_content = ','.join(cursor.mogrify("(%s, %s, %s)",
                                                          (serialize.keccak(text=pair[0] + pair[1]).hex(),

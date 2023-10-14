@@ -1,7 +1,7 @@
 """
-Author: Justin Jia
-Last Updated: August 21, 2023
-Version: 1.0.1
+Author: Justin Jia, Zhenhao Lu
+Last Updated: October 14, 2023
+Version: 1.0.3
 """
 import os
 
@@ -186,16 +186,6 @@ def create_tables(connection):
         """)
         connection.commit()
         print("Tables created successfully!")
-
-    # try:
-    #     cursor = connection.cursor()
-    #     for command in commands:
-    #         cursor.execute(command)
-    #     cursor.close()
-    #     connection.commit()
-    #     print("Tables created successfully!")
-    # except (Exception, psycopg2.Error) as error:
-    #     print("Error while creating PostgreSQL tables:", error)
 
 # if __name__ == "__main__":
 #     connection = create_connection()
