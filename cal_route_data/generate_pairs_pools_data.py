@@ -15,6 +15,8 @@ CAL_ROUTE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_pairs(connection, min_holders, limit, offset):
+    # Get a group of pairs for computing routes, use limit and offset to specify the part to extract
+    # ORDER BY is necessary
     with connection.cursor() as cursor:
         search_command = f"""
             SELECT P.pair_address, T1.token_address, T2.token_address
@@ -32,6 +34,7 @@ def get_pairs(connection, min_holders, limit, offset):
 
 def get_pool_pairs(connection, min_tvl, min_holder):
     with connection.cursor() as cursor:
+        # Get all pools and the tokens included by them filtered by min_tvl
         search_command = f"""
             SELECT DISTINCT PO.pool_address, PO.protocol_name, PT1.token_address, PT2.token_address
             FROM "Pool_Token" PT1
@@ -41,6 +44,7 @@ def get_pool_pairs(connection, min_tvl, min_holder):
         """
         cursor.execute(search_command)
         graph_draft = cursor.fetchall()
+        # Select the number of pairs that will be computed this time
         cursor.execute(f"""
             SELECT COUNT(T1.token_address)
             FROM "Token" T1
@@ -52,9 +56,15 @@ def get_pool_pairs(connection, min_tvl, min_holder):
 
 
 def get_blockchain_name(connection):
+    # In general, the blockchain name of this calculation should be the same as database's name, just in case.
     with connection.cursor() as cursor:
         cursor.execute('SELECT blockchain_name FROM "Pool" LIMIT 1')
         return cursor.fetchone()[0]
+
+
+"""
+    All Code Functions below are useless
+"""
 
 
 def connect_db(user, password, host, database, port=5432):

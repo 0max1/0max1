@@ -81,15 +81,12 @@ def create_result(data, folder_name, chunk_index, has_routes, cursor, folder_nam
     file_name = generate_filename(data, chunk_index)
     filename = os.path.join(folder_name, file_name)
     file_name = os.path.join(folder_name_s, file_name)
+    # record those pairs and their routes file name into database
     args = ','.join(cursor.mogrify("(%s, %s)",
                                    (pair_address, file_name)).decode('utf-8')
                     for pair_address in has_routes)
     cursor.execute('INSERT INTO "Pair_Temp" VALUES ' + args)
-    # cursor.execute(f"""
-    #             UPDATE "Pair"
-    #             SET pair_flag = TRUE, routes_data = '{file_name}'
-    #             WHERE pair_address IN (SELECT pair_address FROM "Temp")""")
-    # cursor.execute('DELETE FROM "Temp"')
+    # writing into a file
     with open(filename, 'w') as f:
         json.dump(data, f, indent=4, default=default_serializer)
 
@@ -117,6 +114,7 @@ def create_result(data, folder_name, chunk_index, has_routes, cursor, folder_nam
 
 
 def build_graph(pools):
+    # This is an undirected graph
     graph = defaultdict(list)
     for pool in pools:
         graph[pool[2]].append((pool[3], pool[0], pool[1]))
@@ -126,8 +124,7 @@ def build_graph(pools):
 
 def build_temp(connection):
     with connection.cursor() as cursor:
-        # cursor.execute('UPDATE "Pair" SET pair_flag = FALSE')
-        # print("All flags initialized")
+        # build a temp table so that the final update can be done once
         cursor.execute('DROP TABLE IF EXISTS "Pair_Temp"')
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS "Pair_Temp" (
@@ -212,6 +209,28 @@ def chunk_pairs(pairs, chunk_size=50):
 
 
 def get_pair_routes(pairs, graph, depth_limit, route_pairs, chunk_index):
+    """
+    Get routes of all pairs using DFS
+    :param pairs: the pairs that need to be calculated
+    :param graph: the graph use to search routes
+    :param depth_limit: the maximum of depth for DFS
+    :param route_pairs: a list to accommodate all results to generate result files
+    :param chunk_index: index of chunk, only for printing logs
+    :return: [pair1, pair2, ..., pair_i]
+            pair_i = {
+                id: pair_address = keccak-256(token1+token2)
+                tokens: [token1_address, token2_address]
+                routes_num: total number of available routes of pair_i
+                routes: [depth = 1, depth = 2, ..., depth = i]
+            }
+            depth = i: [route1, route2, ..., route_i]
+            route_i = {
+                depth: depth of this route
+                route_id: an automatically increasing value. route_id = x means the xth route of a pair
+                    which depth is {depth}
+                pools: details of route (see route_i in the comment of function new_dfs)
+            }
+    """
     for pair in tqdm(pairs, total=len(pairs), desc=f"Processing pairs {chunk_index} "):
         # for pair in pairs:
         routes = new_dfs(pair[1], pair[2], depth_limit, graph, {pair[1]})
@@ -241,6 +260,29 @@ def get_pair_routes(pairs, graph, depth_limit, route_pairs, chunk_index):
 
 
 def new_dfs(current_token, target_token, depth_limit, graph, visited_tokens):
+    """
+    DFS Algorithm, get all routes which depth <= depth limit using recursion
+    :param current_token: start node
+    :param target_token: end node
+    :param depth_limit: allowed maximum of depth
+    :param graph: the graph to search routes on
+    :param visited_tokens: the nodes that have already been visited before visiting current_token
+    :return: if start node is the end node:
+                    return an list of empty path (an empty list)
+            if depth limit <= 0, searcher cannot keep searching
+                return an empty list
+            if not find any routes: return an empty list
+            if find some routes:
+                return a list of routes which are all available routes from start node to end node
+    return  all_routes_of_a_pair = [routes1, routes2, ..., routes_i]
+            routes_i = [step1, step2, ..., step_i]
+            step_i = {
+                    pool_address(edge): Which pool (edge) should I use (walk) to transfer from token1 to token2?
+                    token1: where am I? (for step1, token1 should be the start node)
+                    token2: where am I going to? (for the last step, token2 should be the end node)
+                    protocol_name: the protocol name of the pool (edge) that I'm going to use to transfer
+                    }
+    """
     if current_token == target_token:
         return [[]]
     if depth_limit <= 0:
@@ -248,9 +290,13 @@ def new_dfs(current_token, target_token, depth_limit, graph, visited_tokens):
     final_result = []
     for next_node in graph[current_token]:
         if next_node[0] not in visited_tokens:
+            # Mark next node/token
             visited_tokens.add(next_node[0])
+            # Calculated next steps
             next_results = new_dfs(next_node[0], target_token, depth_limit - 1, graph, visited_tokens)
+            # all routes start from next node has been calculated, cancel the mark
             visited_tokens.remove(next_node[0])
+            # add current step into the front of all calculated routes
             if len(next_results) > 0:
                 this_path = {
                     "pool_address": next_node[1],
