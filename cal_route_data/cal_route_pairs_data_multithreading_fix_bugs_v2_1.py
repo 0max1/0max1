@@ -114,6 +114,15 @@ def create_result(data, folder_name, chunk_index, has_routes, cursor, folder_nam
 
 
 def build_graph(pools):
+    """
+    Build graph with pool data
+    :param pools: pools data get from database [pool_tokens1, pool_tokens2, ..., pool_tokens_i]
+            pool_tokens_i = (pool_i_address, factory_address, token1_address_in_pool_i, token2_address_in_pool_i)
+    :return: a graph
+        {token1_address:[...], token2_address: [...], token_i_address: [...]}
+        token_i_address = [token_k_address, pool_j_address, factory_address]
+        token_i and token_k must be in pool_j
+    """
     # This is an undirected graph
     graph = defaultdict(list)
     for pool in pools:

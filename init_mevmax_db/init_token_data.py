@@ -77,6 +77,7 @@ def insert_token_table(connection, token_data):
                         for token in token_data)
         cursor.execute('INSERT INTO "Token" VALUES ' + args)
         connection.commit()
+        print("Token Table Initialization")
 
 # if __name__ == "__main__":
 #     user = "postgres",

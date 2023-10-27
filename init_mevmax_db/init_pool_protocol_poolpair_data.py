@@ -165,27 +165,28 @@ def prepare_pool_data(connection, pool_data):
                 pool_list: address, blockchain, protocol, tvl and fee of all pools
                 pool_pair_list: a list of tuple (pool A, a token in A)
     """
-    protocols = set()
+    protocols = dict()
     tokens = set()
     pool_pair_list = []
     pool_list = []
     for pool in pool_data:
         # add new protocol
-        protocols.add(pool["Name"])
+        # protocols.add((pool['factory'], pool["Name"]))
+        protocols[pool['factory']] = pool['name']
         # collect new pool's information
-        pool_info = [pool["pool_address"], pool["Name"], pool["tvl"], pool["fee"]]
+        pool_info = [pool["contract"], pool["factory"], pool["tvl"], pool["fee"]]
         # look through all tokens included by this pool (1~9)
         # If in the future the structure become "tokens": [token1, token2, ...],
         #   change the 4 lines below
         i = 1
         while i < 9 and pool.get(f"token{i}"):
             tokens.add(pool.get(f"token{i}"))
-            pool_pair_list.append((pool["pool_address"], pool.get(f"token{i}")))
+            pool_pair_list.append((pool["contract"], pool.get(f"token{i}")))
             i += 1
         # add new pool
         pool_list.append(pool_info)
     # Now, all protocol exist in pools are collected. Then insert them into the Protocol Table
-    insert_protocol_table(connection, list(protocols))
+    insert_protocol_table(connection, protocols)
     return pool_pair_list, pool_list, tokens
 
 
@@ -193,11 +194,14 @@ def insert_protocol_table(connection, protocols):
     """
 
     :param connection: (psycopg2.extensions.connection) The database connection object.
-    :param protocols: all unique protocols
+    :param protocols: a dictionary {factory_address: protocol_name}
     """
     with connection.cursor() as cursor:
-        insert_command = ','.join(cursor.mogrify("(%s)", (protocol,)).decode('utf-8') for protocol in protocols)
-        cursor.execute('INSERT INTO "Protocol" VALUES ' + insert_command + ' ON CONFLICT DO NOTHING')
+        insert_command = ','.join(cursor.mogrify("(%s, %s)",
+                                                 (protocol, protocols[protocol])).decode('utf-8')
+                                  for protocol in list(protocols.keys()))
+        cursor.execute('INSERT INTO "Protocol" VALUES ' + insert_command +
+                       ' ON CONFLICT(factory_address) DO UPDATE SET protocol_name = EXCLUDED.protocol_name')
         connection.commit()
 
 # if __name__ == "__main__":

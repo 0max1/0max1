@@ -136,7 +136,8 @@ def create_tables(connection):
         # Create "Protocol"
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS "Protocol" (
-                "protocol_name" VARCHAR(50) PRIMARY KEY
+                "factory_address" VARCHAR(100) PRIMARY KEY,
+                "protocol_name" VARCHAR (50)
             )
         """)
         # Create "BlockChain"
@@ -169,7 +170,7 @@ def create_tables(connection):
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS "Pool" (
                 "pool_address" VARCHAR(50) PRIMARY KEY ,
-                "protocol_name" VARCHAR(50) REFERENCES "Protocol"("protocol_name"),
+                "factory_address" VARCHAR(50) REFERENCES "Protocol"("factory_address"),
                 "blockchain_name" VARCHAR(50) REFERENCES "BlockChain"("blockchain_name") NOT NULL,
                 "tvl" NUMERIC,
                 "fee" NUMERIC(10, 8),

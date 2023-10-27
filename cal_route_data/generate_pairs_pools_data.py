@@ -36,7 +36,7 @@ def get_pool_pairs(connection, min_tvl, min_holder):
     with connection.cursor() as cursor:
         # Get all pools and the tokens included by them filtered by min_tvl
         search_command = f"""
-            SELECT DISTINCT PO.pool_address, PO.protocol_name, PT1.token_address, PT2.token_address
+            SELECT DISTINCT PO.pool_address, PO.factory_address, PT1.token_address, PT2.token_address
             FROM "Pool_Token" PT1
             JOIN "Pool_Token" PT2 ON PT1.pool_address = PT2.pool_address AND PT1.token_address < PT2.token_address
             JOIN "Pool" PO ON PO.pool_address = PT1.pool_address

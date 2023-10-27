@@ -3,9 +3,10 @@ Author: Justin Jia
 Last Updated: August 21, 2023
 Version: 1.0.1
 """
-
+from init_mevmax_db import create_connection
 from main import init_db_main, update_db_main, get_route_data_main, get_row_data_main
 from datetime import datetime
+from main.update_db import update_db
 
 
 def main():
@@ -13,7 +14,7 @@ def main():
     start = datetime.now()
     # init_db_main()
     # update_db_main()
-    get_route_data_main()
+    # get_route_data_main()
     print(datetime.now() - start)
     print("Test End")
 

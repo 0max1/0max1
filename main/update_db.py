@@ -16,6 +16,8 @@ from generate_original_data.bsc_data_collection_v2 import get_cal_route_dir
 import configparser
 
 
+# depth = 3: 240+hours
+# depth = 2: 6+ hours
 def main():
     # Load configuration from mevmax_config.ini
     config = ConfigReader()

@@ -194,7 +194,7 @@ def update_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
         cursor.execute('INSERT INTO "Pool" VALUES ' +
                        args +
                        ' ON CONFLICT (pool_address) DO UPDATE SET '
-                       'blockchain_name = EXCLUDED.blockchain_name, protocol_name = EXCLUDED.protocol_name, '
+                       'blockchain_name = EXCLUDED.blockchain_name, factory_address = EXCLUDED.factory_address, '
                        'tvl = EXCLUDED.tvl, fee = EXCLUDED.fee, pool_flag = EXCLUDED.pool_flag')
         # Create a temp table to record all (maybe) changed pools in this update
         cursor.execute('DROP TABLE IF EXISTS "Temp"')
