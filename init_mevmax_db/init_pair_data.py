@@ -42,6 +42,7 @@ def insert_pair_table(connection, holders_pair_flag):
         pair_size = cursor.fetchone()[0]
         pair_size = pair_size * (pair_size - 1) / 2
         offset = 0
+        print("Total Pairs: ", pair_size)
         # Process 2000000 pairs in an iteration. "ORDER BY" is necessary
         # Extract all possible pairs from Token Table
         while offset < pair_size:

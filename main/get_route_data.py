@@ -64,6 +64,7 @@ def main():
             pool.starmap(get_pair_routes, chunk_params)
         # Processing Routes
         routes_pairs = list(route_pairs)
+        print("Find Pairs With Routes: ", len(routes_pairs))
         route_pairs[:] = []
         current_route_num = 0
         start = 0

@@ -49,7 +49,7 @@ def update_pair_table(connection, holders_pair_flag):
                 WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag} 
                 AND (T1.is_new OR T2.is_new)
                 ORDER BY T1.token_address ASC, T2.token_address ASC
-                LIMIT 2000000 OFFSET {update_offset}
+                LIMIT 1000000 OFFSET {update_offset}
             """
             cursor.execute(getNewTokens)
             pairs = cursor.fetchall()
@@ -64,7 +64,7 @@ def update_pair_table(connection, holders_pair_flag):
                                       for pair in pairs)
             # Insert them into Pair Table
             cursor.execute('INSERT INTO "Pair" (pair_address) VALUES ' + insert_content + ' ON CONFLICT DO NOTHING')
-            update_offset += 2000000
+            update_offset += 1000000
         # Update is_new of new tokens
         cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE is_new AND num_holders >= {holders_pair_flag}')
         connection.commit()

@@ -48,6 +48,8 @@ def main():
         # Init the pool, protocol, and pool_pair data.
         pool_data = read_json_data(pool_data_path)
         insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag)
+    else:
+        print("Connection Error")
 
 
 def initialize_db(token_data, pool_data, database_name=''):

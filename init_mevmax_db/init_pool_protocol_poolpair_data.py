@@ -169,6 +169,7 @@ def prepare_pool_data(connection, pool_data):
     tokens = set()
     pool_pair_list = []
     pool_list = []
+    print("Total Pools: ", len(pool_data))
     for pool in pool_data:
         # add new protocol
         # protocols.add((pool['factory'], pool["Name"]))
@@ -178,7 +179,7 @@ def prepare_pool_data(connection, pool_data):
         # look through all tokens included by this pool (1~9)
         # If in the future the structure become "tokens": [token1, token2, ...],
         #   change the 4 lines below
-        i = 1
+        i = 0
         while i < 9 and pool.get(f"token{i}"):
             tokens.add(pool.get(f"token{i}"))
             pool_pair_list.append((pool["contract"], pool.get(f"token{i}")))
