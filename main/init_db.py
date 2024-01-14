@@ -34,15 +34,17 @@ def main():
         # Drop existing tables and constraints, init token, pair, pool, protocol, blockchain, and pool_pair tables
         drop_tables(connection)
         create_tables(connection)
-
+        #
         # Init the token data
         token_data = read_json_data(token_data_path)
         insert_token_table(connection, token_data)
-
         # Init the blockchain data
         initialize_blockchain_table(connection)
 
         # Init the pair data (insert all combinations between existence tokens)
+        # with connection.cursor() as cursor:
+        #     cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
+        #     connection.commit()
         insert_pair_table(connection, holders_pair_flag)
 
         # Init the pool, protocol, and pool_pair data.

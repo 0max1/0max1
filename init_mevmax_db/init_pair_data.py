@@ -45,24 +45,28 @@ def insert_pair_table(connection, holders_pair_flag):
         print("Total Pairs: ", pair_size)
         # Process 2000000 pairs in an iteration. "ORDER BY" is necessary
         # Extract all possible pairs from Token Table
-        while offset < pair_size:
+        while offset < min(pair_size, 5000000):
             cursor.execute(f"""
                 SELECT T1.token_address, T2.token_address
                 FROM "Token" T1
                 JOIN "Token" T2 ON T1.token_address < T2.token_address
                 WHERE T1.num_holders >= {holders_pair_flag} AND T2.num_holders >= {holders_pair_flag}
                 ORDER BY T1.token_address ASC, T2.token_address ASC
-                LIMIT 2000000 OFFSET {offset}
+                LIMIT 1000000 OFFSET {offset}
             """)
             pairs = cursor.fetchall()
             # Compute their pair_address with keccak-256
             if len(pairs) > 0:
+                print("Data collected")
                 insert_content = ','.join(cursor.mogrify("(%s, %s, %s)",
                                                          (serialize.keccak(text=pair[0] + pair[1]).hex(),
                                                           pair[0], pair[1])).decode('utf-8') for pair in pairs)
+                print("Command Build")
                 cursor.execute(
                     'INSERT INTO "Pair" (pair_address, token1_address, token2_address) VALUES ' + insert_content)
-            offset += 2000000
+            else:
+                break
+            offset += 1000000
             print(f"~{offset} pairs have been inserted")
         cursor.execute(f'UPDATE "Token" SET is_new = FALSE WHERE num_holders >= {holders_pair_flag}')
         connection.commit()

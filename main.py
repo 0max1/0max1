@@ -13,7 +13,7 @@ facilitating efficient data retrieval, transformation, and storage.
 import configparser
 import os
 
-from main import init_db_main, update_db_main, get_route_data_main, get_row_data_main
+# from main import init_db_main, update_db_main, get_route_data_main, get_row_data_main
 import sys
 
 

@@ -45,7 +45,7 @@ def main():
 
     # compute routes for pairs in groups to prevent out of memory
     # Each group will generate at least 1 result file unless no pair in a group has routes
-    offset = 0
+    offset = 62000000
     file_index = 0
     old_file_index = 0
     while offset < pair_size:
@@ -114,11 +114,11 @@ def main():
         cursor.execute(f"""
             UPDATE "Pair" P
             SET pair_flag = TRUE, routes_data = T.routes_data
-            FROM "Pair_Temp" T
+            FROM "Pair_Temp_1" T
             WHERE P.pair_address = T.pair_address
         """)
         # Drop the temp table
-        cursor.execute('DROP TABLE IF EXISTS "Pair_Temp"')
+        cursor.execute('DROP TABLE IF EXISTS "Pair_Temp_1"')
         connection.commit()
 
 

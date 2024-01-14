@@ -142,7 +142,7 @@ def insert_pool_table(connection, pool_data, blockchain_name, tvl_pool_flag):
         args = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s)",
                                        (pool_info[0], pool_info[1], blockchain_name,
                                         pool_info[2], pool_info[3],
-                                        pool_info[2] >= float(tvl_pool_flag))).decode('utf-8')
+                                        float(pool_info[2]) >= float(tvl_pool_flag))).decode('utf-8')
                         for pool_info in pool_list)
         cursor.execute('INSERT INTO "Pool" VALUES ' + args)
         # insert tokens which are not recorded by token json file into Token Table
@@ -170,10 +170,12 @@ def prepare_pool_data(connection, pool_data):
     pool_pair_list = []
     pool_list = []
     print("Total Pools: ", len(pool_data))
+    # BSC thena_v1 doesn't have factory address
     for pool in pool_data:
         # add new protocol
         # protocols.add((pool['factory'], pool["Name"]))
-        protocols[pool['factory']] = pool['name']
+        if pool['factory']:
+            protocols[pool['factory']] = pool['name']
         # collect new pool's information
         pool_info = [pool["contract"], pool["factory"], pool["tvl"], pool["fee"]]
         # look through all tokens included by this pool (1~9)

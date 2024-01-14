@@ -12,6 +12,7 @@ from web3 import Web3
 
 def update_token_table(connection, token_data):
     with connection.cursor() as cursor:
+        print("Running:", token_data[0:10])
         insert_content = ','.join(cursor.mogrify("(%s, %s, %s, %s)",
                                                  (token["address"], "",
                                                   int(token.get("decimal", 18)),

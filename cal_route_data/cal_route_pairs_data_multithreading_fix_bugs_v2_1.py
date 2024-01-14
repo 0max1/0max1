@@ -85,7 +85,7 @@ def create_result(data, folder_name, chunk_index, has_routes, cursor, folder_nam
     args = ','.join(cursor.mogrify("(%s, %s)",
                                    (pair_address, file_name)).decode('utf-8')
                     for pair_address in has_routes)
-    cursor.execute('INSERT INTO "Pair_Temp" VALUES ' + args)
+    cursor.execute('INSERT INTO "Pair_Temp_1" VALUES ' + args)
     # writing into a file
     with open(filename, 'w') as f:
         json.dump(data, f, indent=4, default=default_serializer)
@@ -134,9 +134,9 @@ def build_graph(pools):
 def build_temp(connection):
     with connection.cursor() as cursor:
         # build a temp table so that the final update can be done once
-        cursor.execute('DROP TABLE IF EXISTS "Pair_Temp"')
+        cursor.execute('DROP TABLE IF EXISTS "Pair_Temp_1"')
         cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS "Pair_Temp" (
+            CREATE TABLE IF NOT EXISTS "Pair_Temp_1" (
                 "pair_address" VARCHAR(100) PRIMARY KEY,
                 "routes_data" VARCHAR(255)
             )
@@ -202,7 +202,7 @@ def generate_folder(depth_limit, total_pairs, blockchain_name):
 # Split pairs into chunks
 # return a list of numpy.ndarray
 def chunk_pairs(pairs, chunk_size=50):
-    return np.array_split(pairs, pairs.shape[0] // chunk_size)
+    return np.array_split(pairs, max(pairs.shape[0], chunk_size) // chunk_size)
 
 
 # Process each chunk

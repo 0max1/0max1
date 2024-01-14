@@ -5,8 +5,9 @@ Version: 1.0.1
 """
 from init_mevmax_db import create_connection
 from init_mevmax_db.create_mevmax_db import ConfigReader
-from main import init_db_main, update_db_main, get_route_data_main, get_row_data_main
+from main import update_db_main
 from datetime import datetime
+import sys
 from main.update_db import update_db
 
 
@@ -88,10 +89,15 @@ def check_missing_pair():
 def main():
     # get_row_data_main()
     start = datetime.now()
-    init_db_main()
-    # update_db_main()
+    old_stdout = sys.stdout
+    # log_file = open('Logs/BSC/BSC_initial.log', 'w+')
+    # sys.stdout = log_file
+    # init_db_main()
+    update_db_main()
     # get_route_data_main()
     print(datetime.now() - start)
+    # sys.stdout = old_stdout
+    # log_file.close()
     print("Test End")
 
 
