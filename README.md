@@ -1,4 +1,4 @@
-<h1 style="text-align:center">MevMax Project </h1>
+<h1 style="text-align:center">MevMax Project (RUN main_test.py, not main.py)</h1>
 
 <h6 style="text-align:right">Author: Justin Jia </h1>
 <h6 style="text-align:right">Edited: AUG 23, 2023</h1>
